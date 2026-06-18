@@ -2,38 +2,50 @@
 // App surfaces (storefront / detail / library) and console live in separate
 // palettes; the console is intentionally a hair darker than the app.
 
+// Structural colors map to CSS custom properties so Dark/Light/accent apply
+// live (see index.css). Semantic colors (green/amber/blue/red) are fixed —
+// they read acceptably on both themes, matching the design.
 export const C = {
-  bg: '#0A0C10',
-  panel: '#13161C',
-  panelHover: '#181D25',
-  sunk: '#08090C',
-  ink: '#E7EAEF',
-  sub: '#98A0AC',
-  faint: '#59616D',
-  line: '#20262F',
-  line2: '#191E26',
-  accent: '#8E7DF1',
+  bg: 'var(--tv-bg)',
+  panel: 'var(--tv-panel)',
+  panelHover: 'var(--tv-panelHover)',
+  sunk: 'var(--tv-sunk)',
+  ink: 'var(--tv-ink)',
+  sub: 'var(--tv-sub)',
+  faint: 'var(--tv-faint)',
+  line: 'var(--tv-line)',
+  line2: 'var(--tv-line2)',
+  accent: 'var(--tv-accent)',
   accentSoft: 'rgba(142,125,241,.14)',
   green: '#3FB950',
   amber: '#E3B341',
   blue: '#58A6FF',
   red: '#F47067',
-  /** Body text on dark cards — README paragraphs / feature text. */
-  body: '#C4CAD3',
+  /** Body text on cards — README paragraphs / feature text. */
+  body: 'var(--tv-body)',
   /** Border used on a row when its project is installed. */
   installedBorder: '#234D33',
 } as const;
 
-// Console palette (darker than the app).
+// Command/run chips stay dark in both themes (terminal identity; green-on-light
+// reads poorly), so they use these fixed values instead of the themed C tokens.
+export const CHIP = {
+  bg: '#0B0D11',
+  border: 'rgba(255,255,255,.08)',
+} as const;
+
+// Console (dock chrome) palette. Structural colors map to --tc-* so the dock
+// themes with the app; accents stay fixed. The xterm canvas uses literal hex
+// theme objects in TerminalView (a canvas can't read CSS variables).
 export const T = {
-  bg: '#0A0B0E',
-  panel: '#0E1116',
-  bar: '#11151B',
-  line: '#1C2230',
-  line2: '#161B24',
-  text: '#C9D1D9',
-  dim: '#6E7681',
-  faint: '#48505B',
+  bg: 'var(--tc-bg)',
+  panel: 'var(--tc-panel)',
+  bar: 'var(--tc-bar)',
+  line: 'var(--tc-line)',
+  line2: 'var(--tc-line2)',
+  text: 'var(--tc-text)',
+  dim: 'var(--tc-dim)',
+  faint: 'var(--tc-faint)',
   green: '#3FB950',
   cyan: '#2DD4BF',
   amber: '#E3B341',
@@ -45,6 +57,7 @@ export const T = {
 export const sans = "'Plus Jakarta Sans', system-ui, sans-serif";
 export const mono = "'JetBrains Mono', ui-monospace, 'SF Mono', monospace";
 
-/** Visible height of the console dock when open vs collapsed (drives page padding). */
+/** Default / collapsed / minimum height of the console dock (px). */
 export const CONSOLE_OPEN_H = 332;
 export const CONSOLE_COLLAPSED_H = 38;
+export const CONSOLE_MIN_H = 150;

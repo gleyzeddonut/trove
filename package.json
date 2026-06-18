@@ -1,7 +1,7 @@
 {
   "name": "trove",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Trove — a desktop storefront for GitHub with an embedded terminal.",
   "author": "Trove",
   "main": "dist-electron/main.js",
@@ -23,7 +23,9 @@
     "node-pty": "^1.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-markdown": "^9.1.0",
     "react-router-dom": "^6.26.2",
+    "remark-gfm": "^4.0.1",
     "zustand": "^4.5.5"
   },
   "devDependencies": {

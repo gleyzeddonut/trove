@@ -22,6 +22,24 @@ const api = {
   run(command: string) {
     ipcRenderer.send('pty:run', command);
   },
+  /** Ask the main process to replay recent output into this window. */
+  requestBacklog() {
+    ipcRenderer.send('terminal:backlog');
+  },
+  /** Open the terminal in its own window. */
+  popOut() {
+    ipcRenderer.send('terminal:popout');
+  },
+  /** Close the popped-out window and return the terminal to the dock. */
+  popIn() {
+    ipcRenderer.send('terminal:popin');
+  },
+  /** Subscribe to pop-out state changes (main window). Returns unsubscribe. */
+  onPopState(cb: (poppedOut: boolean) => void) {
+    const listener = (_e: IpcRendererEvent, v: boolean) => cb(v);
+    ipcRenderer.on('terminal:popped', listener);
+    return () => ipcRenderer.removeListener('terminal:popped', listener);
+  },
 };
 
 contextBridge.exposeInMainWorld('troveTerminal', api);
@@ -47,6 +65,9 @@ const updater = {
   },
   install() {
     ipcRenderer.send('updater:install');
+  },
+  getVersion(): Promise<string> {
+    return ipcRenderer.invoke('app:version');
   },
 };
 

@@ -14,8 +14,25 @@ const { autoUpdater } = electronUpdater;
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 
 let win: BrowserWindow | null = null;
+let popoutWin: BrowserWindow | null = null;
 let ptyProcess: pty.IPty | null = null;
 let updaterReady = false;
+
+// Recent shell output, replayed to a window when it (re)attaches the terminal —
+// so popping the terminal in/out (or first paint) isn't blank.
+let ptyBuffer = '';
+const PTY_BUFFER_CAP = 100_000;
+
+/** The window currently showing the terminal (popout takes priority). */
+function ptyTarget(): BrowserWindow | null {
+  if (popoutWin && !popoutWin.isDestroyed()) return popoutWin;
+  return win && !win.isDestroyed() ? win : null;
+}
+
+/** Send to a window only if it's still alive (avoids "Object has been destroyed"). */
+function safeSend(target: BrowserWindow | null, channel: string, payload?: unknown) {
+  if (target && !target.isDestroyed()) target.webContents.send(channel, payload);
+}
 
 function defaultShell(): string {
   if (process.platform === 'win32') return process.env.COMSPEC || 'powershell.exe';
@@ -24,7 +41,11 @@ function defaultShell(): string {
 
 function startPty() {
   if (ptyProcess) return;
-  ptyProcess = pty.spawn(defaultShell(), [], {
+  // Launch as a LOGIN shell so it sources the user's profile (.zprofile,
+  // Homebrew shellenv, nvm, etc.). A GUI app gets a minimal PATH from launchd,
+  // so without this `npm`, `brew`, `cargo`, … are "command not found".
+  const args = process.platform === 'win32' ? [] : ['-l'];
+  ptyProcess = pty.spawn(defaultShell(), args, {
     name: 'xterm-256color',
     cols: 80,
     rows: 24,
@@ -33,7 +54,8 @@ function startPty() {
   });
 
   ptyProcess.onData((data) => {
-    win?.webContents.send('pty:data', data);
+    ptyBuffer = (ptyBuffer + data).slice(-PTY_BUFFER_CAP);
+    ptyTarget()?.webContents.send('pty:data', data);
   });
 
   ptyProcess.onExit(() => {
@@ -45,7 +67,7 @@ function startPty() {
 
 // --- Auto-update (electron-updater + GitHub Releases) ---------------------
 function sendUpdate(status: string, extra: Record<string, unknown> = {}) {
-  win?.webContents.send('updater:status', { status, ...extra });
+  safeSend(win, 'updater:status', { status, ...extra });
 }
 
 function setupUpdater() {
@@ -107,10 +129,57 @@ function createWindow() {
   });
 }
 
+// --- Pop-out terminal window ---------------------------------------------
+function openPopout() {
+  if (popoutWin && !popoutWin.isDestroyed()) {
+    popoutWin.focus();
+    return;
+  }
+  popoutWin = new BrowserWindow({
+    width: 760,
+    height: 480,
+    minWidth: 420,
+    minHeight: 240,
+    backgroundColor: '#0A0B0E',
+    title: 'Trove Terminal',
+    webPreferences: {
+      preload: path.join(app.getAppPath(), 'dist-electron/preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+  popoutWin.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  if (DEV_URL) {
+    popoutWin.loadURL(`${DEV_URL}#/__terminal`);
+  } else {
+    popoutWin.loadFile(path.join(app.getAppPath(), 'dist/index.html'), { hash: '/__terminal' });
+  }
+  popoutWin.on('closed', () => {
+    popoutWin = null;
+    safeSend(win, 'terminal:popped', false);
+  });
+  safeSend(win, 'terminal:popped', true);
+}
+
 // --- IPC: renderer <-> pty ------------------------------------------------
 ipcMain.on('pty:input', (_e, data: string) => {
   ptyProcess?.write(data);
 });
+
+ipcMain.on('terminal:backlog', (e) => {
+  if (ptyBuffer) e.sender.send('pty:data', ptyBuffer);
+});
+
+ipcMain.on('terminal:popout', () => openPopout());
+ipcMain.on('terminal:popin', () => {
+  if (popoutWin && !popoutWin.isDestroyed()) popoutWin.close();
+});
+
+ipcMain.handle('app:version', () => app.getVersion());
 
 ipcMain.on('pty:resize', (_e, size: { cols: number; rows: number }) => {
   if (ptyProcess && size.cols > 0 && size.rows > 0) ptyProcess.resize(size.cols, size.rows);
@@ -139,8 +208,9 @@ app.on('activate', () => {
 });
 
 app.on('window-all-closed', () => {
-  ptyProcess?.kill();
-  ptyProcess = null;
+  // On macOS the app stays alive when its windows close — keep the shell
+  // running so the session survives reopening the window. Other platforms
+  // quit, which kills the pty via before-quit.
   if (process.platform !== 'darwin') app.quit();
 });
 

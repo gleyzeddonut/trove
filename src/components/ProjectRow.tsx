@@ -5,23 +5,22 @@
 
 import { useState } from 'react';
 import { C, mono, sans } from '../tokens';
-import { Caret, Check, Fork, Star, Trash } from './icons';
+import { Caret, Check, ExternalLink, Fork, GitHubMark, Star, Trash } from './icons';
 import { CommandChip } from './CommandChip';
 import { k } from '../lib/derive';
+import { openExternal } from '../lib/external';
 import type { Project } from '../types';
 
 interface Props {
   p: Project;
   installed: boolean;
-  /** 'library' shows the uninstall button. */
-  mode: 'discover' | 'library';
   onOpenDetail: (p: Project) => void;
   onInstall: (p: Project) => void;
   onOpen: (p: Project) => void;
   onUninstall: (p: Project) => void;
 }
 
-export function ProjectRow({ p, installed, mode, onOpenDetail, onInstall, onOpen, onUninstall }: Props) {
+export function ProjectRow({ p, installed, onOpenDetail, onInstall, onOpen, onUninstall }: Props) {
   const [open, setOpen] = useState(false);
   const topics = (p.topics || []).filter(Boolean).slice(0, 8);
   const forks = k(p.forksNum || 0);
@@ -77,15 +76,16 @@ export function ProjectRow({ p, installed, mode, onOpenDetail, onInstall, onOpen
             {p.stars}
           </div>
 
-          {mode === 'library' && (
+          {installed && (
             <button
               className="hs-uninstall"
-              title="Uninstall"
+              title={`Uninstall ${p.name}`}
               aria-label={`Uninstall ${p.name}`}
               onClick={(e) => { e.stopPropagation(); onUninstall(p); }}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, border: `1px solid ${C.line}`, background: 'transparent', borderRadius: 9, cursor: 'pointer', color: C.faint }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', border: `1px solid ${C.line}`, background: 'transparent', borderRadius: 9, cursor: 'pointer', color: C.faint, fontFamily: sans, fontWeight: 700, fontSize: 13 }}
             >
               <Trash />
+              Uninstall
             </button>
           )}
 
@@ -147,6 +147,15 @@ export function ProjectRow({ p, installed, mode, onOpenDetail, onInstall, onOpen
               {p.license && p.license !== 'No license' && <span>{p.license}</span>}
               <span>updated {p.updated}</span>
               <div style={{ flex: 1 }} />
+              <button
+                onClick={(e) => { e.stopPropagation(); openExternal(p.htmlUrl); }}
+                title="Open on github.com"
+                style={{ display: 'flex', alignItems: 'center', gap: 5, border: 'none', background: 'transparent', color: C.sub, fontFamily: sans, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: 0 }}
+              >
+                <GitHubMark s={13} />
+                GitHub
+                <ExternalLink stroke={C.faint} />
+              </button>
               <button
                 onClick={(e) => { e.stopPropagation(); onOpenDetail(p); }}
                 style={{ border: 'none', background: 'transparent', color: C.accent, fontFamily: sans, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}

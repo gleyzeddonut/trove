@@ -6,6 +6,10 @@ export interface TroveTerminalApi {
   sendInput(data: string): void;
   resize(cols: number, rows: number): void;
   run(command: string): void;
+  requestBacklog(): void;
+  popOut(): void;
+  popIn(): void;
+  onPopState(cb: (poppedOut: boolean) => void): () => void;
 }
 
 export type UpdateStatus =
@@ -28,6 +32,7 @@ export interface TroveUpdaterApi {
   check(): void;
   download(): void;
   install(): void;
+  getVersion(): Promise<string>;
 }
 
 declare global {

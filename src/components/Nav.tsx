@@ -1,9 +1,10 @@
 // Persistent top navigation. Tabs filter Discover by type; Library shows a
 // count badge of installed items and routes to /library.
 
+import { useNavigate } from 'react-router-dom';
 import { C, mono, sans } from '../tokens';
-import { TokenSettings } from './TokenSettings';
 import { UpdateButton } from './UpdateButton';
+import { useTroveStore } from '../store/useTroveStore';
 
 export type NavItem = 'Discover' | 'Feed' | 'Apps' | 'Tools' | 'Creative' | 'Library';
 
@@ -19,11 +20,13 @@ interface NavProps {
 }
 
 export function Nav({ active, consoleOpen, libraryCount, onToggleConsole, onHome, onNav }: NavProps) {
+  const navigate = useNavigate();
+  const account = useTroveStore((s) => s.account);
   return (
     <div
       style={{
         position: 'sticky', top: 0, zIndex: 20, height: 60,
-        borderBottom: `1px solid ${C.line2}`, background: 'rgba(10,12,16,.82)',
+        borderBottom: `1px solid ${C.line2}`, background: 'var(--tv-navbg)',
         backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
         display: 'flex', alignItems: 'center', padding: '0 28px', gap: 24,
       }}
@@ -93,7 +96,26 @@ export function Nav({ active, consoleOpen, libraryCount, onToggleConsole, onHome
         <span style={{ fontFamily: mono, fontSize: 11, color: C.faint, border: `1px solid ${C.line}`, borderRadius: 5, padding: '1px 5px' }}>⌘J</span>
       </button>
 
-      <TokenSettings />
+      <button
+        onClick={() => navigate('/settings')}
+        aria-label="Settings & account"
+        title={account ? `@${account.login} — Settings` : 'Connect GitHub · Settings'}
+        style={{ position: 'relative', width: 31, height: 31, borderRadius: 31, border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0, overflow: 'visible', background: 'transparent' }}
+      >
+        {account ? (
+          <img src={account.avatarUrl} alt="" width={31} height={31} style={{ width: 31, height: 31, borderRadius: 31, objectFit: 'cover', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.2)' }} />
+        ) : (
+          <>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 31, height: 31, borderRadius: 31, background: C.panel, border: `1px solid ${C.line}` }}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke={C.sub} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="8" cy="6" r="2.6" />
+                <path d="M3 13c0-2.2 2.2-3.6 5-3.6s5 1.4 5 3.6" />
+              </svg>
+            </span>
+            <span style={{ position: 'absolute', top: -1, right: -1, width: 9, height: 9, borderRadius: 9, background: C.amber, boxShadow: `0 0 0 2px ${C.bg}` }} />
+          </>
+        )}
+      </button>
     </div>
   );
 }

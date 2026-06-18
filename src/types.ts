@@ -29,6 +29,8 @@ export interface Project {
   topics: string[];
   /** Numeric fork count, for the expandable row summary. */
   forksNum: number;
+  /** Link to the repository page on github.com. */
+  htmlUrl: string;
   /** CSS gradient string (thumb / cover). */
   cover: string;
   /** Representative accent color. */

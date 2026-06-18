@@ -4,9 +4,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   SEARCH_MAX_PAGE,
+  cachedProject,
+  cachedRepoDetail,
   fetchCreatorProfile,
   fetchFeed,
   fetchRepo,
+  previewDetail,
   searchRepos,
   type Contributor,
   type CreatorProfile,
@@ -25,17 +28,32 @@ interface SearchState {
   loadMore: () => void;
 }
 
+// Session-lived cache keyed by query, so revisiting Discover (or re-running a
+// previous search) is instant and spends no API calls. Entries older than
+// FRESH_MS are still shown immediately, then refreshed in the background
+// (stale-while-revalidate). Cleared when the app is relaunched.
+interface SearchCacheEntry {
+  results: Project[];
+  total: number;
+  page: number;
+  ts: number;
+}
+const searchCache = new Map<string, SearchCacheEntry>();
+const FRESH_MS = 5 * 60 * 1000;
+const keyOf = (q: string) => q.trim().toLowerCase();
+
 export function useGithubSearch(query: string, enabled: boolean): SearchState {
-  const [results, setResults] = useState<Project[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(enabled);
+  // Seed initial state from cache so a revisit paints with no spinner/flash.
+  const seed = enabled ? searchCache.get(keyOf(query)) : undefined;
+  const [results, setResults] = useState<Project[]>(seed?.results ?? []);
+  const [total, setTotal] = useState(seed?.total ?? 0);
+  const [loading, setLoading] = useState(enabled && !seed);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const pageRef = useRef(1);
+  const pageRef = useRef(seed?.page ?? 1);
   const reqRef = useRef(0); // guards against out-of-order / stale responses
 
-  // (re)load page 1 whenever the query changes
   useEffect(() => {
     if (!enabled) {
       setResults([]);
@@ -44,26 +62,54 @@ export function useGithubSearch(query: string, enabled: boolean): SearchState {
       setError(null);
       return;
     }
+    const key = keyOf(query);
     const token = ++reqRef.current;
+    const cached = searchCache.get(key);
+
+    if (cached) {
+      // Serve instantly from cache…
+      pageRef.current = cached.page;
+      setResults(cached.results);
+      setTotal(cached.total);
+      setError(null);
+      setLoading(false);
+      // …and silently refresh if it's gone stale. Skip when the user has paged
+      // past the first page, so a refresh doesn't collapse loaded results.
+      if (Date.now() - cached.ts > FRESH_MS && cached.page === 1) {
+        searchRepos(query, 1)
+          .then(({ items, totalCount }) => {
+            if (reqRef.current !== token) return;
+            searchCache.set(key, { results: items, total: totalCount, page: 1, ts: Date.now() });
+            pageRef.current = 1;
+            setResults(items);
+            setTotal(totalCount);
+          })
+          .catch(() => {
+            /* keep showing cached data on error */
+          });
+      }
+      return;
+    }
+
+    // Cache miss → fetch (debounce typed queries, load defaults immediately).
     pageRef.current = 1;
     setLoading(true);
     setError(null);
-    const delay = query.trim() ? 420 : 0; // debounce typing, load defaults immediately
+    const delay = query.trim() ? 420 : 0;
     const id = window.setTimeout(async () => {
       try {
         const { items, totalCount } = await searchRepos(query, 1);
-        if (reqRef.current === token) {
-          setResults(items);
-          setTotal(totalCount);
-          setLoading(false);
-        }
+        if (reqRef.current !== token) return;
+        searchCache.set(key, { results: items, total: totalCount, page: 1, ts: Date.now() });
+        setResults(items);
+        setTotal(totalCount);
+        setLoading(false);
       } catch (e) {
-        if (reqRef.current === token) {
-          setResults([]);
-          setTotal(0);
-          setError((e as Error).message || 'Failed to load.');
-          setLoading(false);
-        }
+        if (reqRef.current !== token) return;
+        setResults([]);
+        setTotal(0);
+        setError((e as Error).message || 'Failed to load.');
+        setLoading(false);
       }
     }, delay);
     return () => window.clearTimeout(id);
@@ -77,10 +123,15 @@ export function useGithubSearch(query: string, enabled: boolean): SearchState {
     setLoadingMore(true);
     try {
       const { items } = await searchRepos(query, next);
-      if (reqRef.current === token) {
-        pageRef.current = next;
-        setResults((prev) => [...prev, ...items]);
-      }
+      if (reqRef.current !== token) return;
+      pageRef.current = next;
+      setResults((prev) => {
+        const merged = [...prev, ...items];
+        const key = keyOf(query);
+        const entry = searchCache.get(key);
+        if (entry) searchCache.set(key, { ...entry, results: merged, page: next });
+        return merged;
+      });
     } catch (e) {
       if (reqRef.current === token) setError((e as Error).message || 'Failed to load more.');
     } finally {
@@ -99,19 +150,36 @@ interface RepoState {
   error: string | null;
 }
 
+// Seed from caches so the page paints immediately: a full cached detail (instant,
+// no fetch) or a preview built from the list's project data (header/sidebar now,
+// README + contributors stream in).
+function seedRepo(owner?: string, name?: string): RepoState {
+  if (!owner || !name) return { detail: null, loading: true, error: null };
+  const cached = cachedRepoDetail(owner, name);
+  if (cached) return { detail: cached, loading: false, error: null };
+  const preview = cachedProject(owner, name);
+  return { detail: preview ? previewDetail(preview) : null, loading: true, error: null };
+}
+
 export function useGithubRepo(owner?: string, name?: string): RepoState {
-  const [state, setState] = useState<RepoState>({ detail: null, loading: true, error: null });
+  const [state, setState] = useState<RepoState>(() => seedRepo(owner, name));
 
   useEffect(() => {
     if (!owner || !name) {
       setState({ detail: null, loading: false, error: 'Project not found.' });
       return;
     }
+    const seed = seedRepo(owner, name);
+    setState(seed);
+    if (!seed.loading) return; // fresh cached detail — nothing to fetch
     let active = true;
-    setState({ detail: null, loading: true, error: null });
     fetchRepo(owner, name)
       .then((detail) => active && setState({ detail, loading: false, error: null }))
-      .catch((e: Error) => active && setState({ detail: null, loading: false, error: e.message || 'Failed to load.' }));
+      .catch(
+        (e: Error) =>
+          active &&
+          setState((s) => ({ detail: s.detail, loading: false, error: s.detail ? null : e.message || 'Failed to load.' })),
+      );
     return () => {
       active = false;
     };
@@ -153,16 +221,16 @@ interface FeedState {
   error: string | null;
 }
 
-export function useFeed(following: string[]): FeedState {
+export function useFeed(following: string[], scope: 'following' | 'all' = 'following'): FeedState {
   const [state, setState] = useState<FeedState>({ data: null, loading: true, error: null });
-  const key = following.join(',');
+  const key = `${scope}|${following.join(',')}`;
   const hasData = useRef(false);
 
   useEffect(() => {
     let active = true;
     // Keep showing prior data while re-fetching (e.g. after a follow toggle).
     setState((s) => ({ data: s.data, loading: !hasData.current, error: null }));
-    fetchFeed(following)
+    fetchFeed(following, scope)
       .then((data) => {
         if (!active) return;
         hasData.current = true;

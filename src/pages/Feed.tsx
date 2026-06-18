@@ -26,9 +26,10 @@ export function Feed() {
   const consoleOpen = useTroveStore((s) => s.consoleOpen);
   const toggleConsole = useTroveStore((s) => s.toggleConsole);
   const installedCount = useTroveStore((s) => s.installed.length);
+  const feedScope = useTroveStore((s) => s.settings.feedScope);
   const { onHome, onNav } = useNavActions();
 
-  const { data, loading, error } = useFeed(following);
+  const { data, loading, error } = useFeed(following, feedScope);
 
   const creators = data?.creators ?? {};
   const followed = data?.followed ?? following;

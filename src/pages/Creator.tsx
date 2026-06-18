@@ -63,7 +63,7 @@ export function Creator() {
       {/* cover banner */}
       <div style={{ height: 150, background: c.cover, position: 'relative' }}>
         <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(120% 120% at 80% 0%,rgba(255,255,255,.22),transparent 55%)' }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,transparent 30%,rgba(10,12,16,.65) 100%)' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,transparent 40%,var(--tv-bg) 100%)' }} />
       </div>
 
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 28px 52px' }}>

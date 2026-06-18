@@ -1,126 +1,69 @@
-// The embedded terminal — a real PTY-backed shell rendered with xterm.js,
-// docked to the bottom of the app. It behaves exactly like a normal terminal;
-// "run" buttons elsewhere in the app type real commands into this same shell.
+// The docked terminal: a resizable, pop-out-able dock at the bottom of the app.
+// The terminal itself lives in <TerminalView/> (shared with the popped-out
+// window). Drag the top edge to resize; "pop out" moves it to its own window.
 
-import { useEffect, useRef } from 'react';
-import { Terminal } from '@xterm/xterm';
-import { FitAddon } from '@xterm/addon-fit';
-import '@xterm/xterm/css/xterm.css';
-import { CONSOLE_OPEN_H, T, mono } from '../../tokens';
-import { ConsoleChevron } from '../icons';
+import { useRef } from 'react';
+import { CONSOLE_MIN_H, T, mono } from '../../tokens';
+import { ConsoleChevron, PopOut } from '../icons';
+import { TerminalView, type TerminalHandle } from './TerminalView';
 import { useTroveStore } from '../../store/useTroveStore';
 
 const HEADER_H = 38;
 
-// xterm theme matched to the console palette in the design tokens.
-const THEME = {
-  background: T.bg,
-  foreground: T.text,
-  cursor: T.green,
-  cursorAccent: T.bg,
-  selectionBackground: 'rgba(142,125,241,.28)',
-  black: '#0A0B0E',
-  red: T.red,
-  green: T.green,
-  yellow: T.amber,
-  blue: T.blue,
-  magenta: T.mag,
-  cyan: T.cyan,
-  white: T.text,
-  brightBlack: T.faint,
-  brightRed: T.red,
-  brightGreen: T.green,
-  brightYellow: T.amber,
-  brightBlue: T.blue,
-  brightMagenta: T.mag,
-  brightCyan: T.cyan,
-  brightWhite: '#FFFFFF',
-};
-
 export function Console() {
   const open = useTroveStore((s) => s.consoleOpen);
-  const installedCount = useTroveStore((s) => s.installed.length);
   const toggle = useTroveStore((s) => s.toggleConsole);
+  const installedCount = useTroveStore((s) => s.installed.length);
+  const height = useTroveStore((s) => s.consoleHeight);
+  const setHeight = useTroveStore((s) => s.setConsoleHeight);
+  const poppedOut = useTroveStore((s) => s.poppedOut);
 
-  const mountRef = useRef<HTMLDivElement>(null);
-  const termRef = useRef<Terminal | null>(null);
-  const fitRef = useRef<FitAddon | null>(null);
+  const termRef = useRef<TerminalHandle>(null);
   const hasShell = typeof window !== 'undefined' && !!window.troveTerminal;
 
-  // Create the terminal once and wire it to the real shell.
-  useEffect(() => {
-    if (!mountRef.current || !window.troveTerminal) return;
-
-    const term = new Terminal({
-      fontFamily: mono,
-      fontSize: 12.5,
-      lineHeight: 1.25,
-      cursorBlink: true,
-      theme: THEME,
-      allowProposedApi: true,
-      scrollback: 5000,
-    });
-    const fit = new FitAddon();
-    term.loadAddon(fit);
-    term.open(mountRef.current);
-    termRef.current = term;
-    fitRef.current = fit;
-
-    const sync = () => {
-      try {
-        fit.fit();
-        window.troveTerminal?.resize(term.cols, term.rows);
-      } catch {
-        /* container not measurable yet */
-      }
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startY = e.clientY;
+    const startH = height;
+    const maxH = Math.max(CONSOLE_MIN_H, window.innerHeight - 76);
+    const onMove = (ev: MouseEvent) => {
+      const next = Math.min(maxH, Math.max(CONSOLE_MIN_H, startH + (startY - ev.clientY)));
+      setHeight(next);
     };
-    sync();
-
-    const offData = window.troveTerminal.onData((data) => term.write(data));
-    const onInput = term.onData((data) => window.troveTerminal?.sendInput(data));
-
-    const ro = new ResizeObserver(() => sync());
-    ro.observe(mountRef.current);
-
-    return () => {
-      offData();
-      onInput.dispose();
-      ro.disconnect();
-      term.dispose();
-      termRef.current = null;
-      fitRef.current = null;
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.userSelect = '';
     };
-  }, []);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    document.body.style.userSelect = 'none';
+  };
 
-  // Refit + focus whenever the dock opens (its size becomes meaningful).
-  useEffect(() => {
-    if (!open) return;
-    const id = window.setTimeout(() => {
-      try {
-        fitRef.current?.fit();
-        const term = termRef.current;
-        if (term) {
-          window.troveTerminal?.resize(term.cols, term.rows);
-          term.focus();
-        }
-      } catch {
-        /* noop */
-      }
-    }, 60);
-    return () => window.clearTimeout(id);
-  }, [open]);
+  const dockable = hasShell && open && !poppedOut;
 
   return (
     <div
       style={{
         position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 50,
-        height: CONSOLE_OPEN_H, background: T.bg, borderTop: `1px solid ${T.line}`,
-        transform: open ? 'translateY(0)' : `translateY(${CONSOLE_OPEN_H - HEADER_H}px)`,
+        height, backgroundColor: T.bg, borderTop: `1px solid ${T.line}`,
+        transform: open ? 'translateY(0)' : `translateY(${height - HEADER_H}px)`,
         transition: 'transform .28s cubic-bezier(.4,0,.1,1)',
         boxShadow: open ? '0 -18px 50px rgba(0,0,0,.32)' : '0 -2px 12px rgba(0,0,0,.12)',
         display: 'flex', flexDirection: 'column', fontFamily: mono,
       }}
     >
+      {/* RESIZE HANDLE (top edge, only when docked + open) */}
+      {dockable && (
+        <div
+          className="hc-resize"
+          onMouseDown={startResize}
+          title="Drag to resize"
+          style={{ position: 'absolute', top: -2, left: 0, right: 0, height: 7, cursor: 'ns-resize', zIndex: 3 }}
+        />
+      )}
+
       {/* HEADER / STATUS STRIP */}
       <div
         className={open ? undefined : 'hc-bar'}
@@ -133,20 +76,34 @@ export function Console() {
         </span>
         <span style={{ fontSize: 12, color: T.faint }}>›</span>
         <span style={{ fontSize: 12, color: T.dim, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {hasShell ? 'interactive shell' : 'run in the desktop app for a live shell'}
+          {!hasShell ? 'run in the desktop app for a live shell' : poppedOut ? 'popped out →' : 'interactive shell'}
         </span>
         <span style={{ fontSize: 11.5, color: T.faint }}>{installedCount} installed</span>
-        {open && hasShell && (
-          <span
-            className="hc-tabtn"
-            role="button"
-            tabIndex={0}
-            onClick={(e) => { e.stopPropagation(); termRef.current?.clear(); }}
-            onKeyDown={(e) => e.key === 'Enter' && termRef.current?.clear()}
-            style={{ fontSize: 11.5, color: T.dim }}
-          >
-            clear
-          </span>
+        {open && hasShell && !poppedOut && (
+          <>
+            <span
+              className="hc-tabtn"
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); termRef.current?.clear(); }}
+              onKeyDown={(e) => e.key === 'Enter' && termRef.current?.clear()}
+              style={{ fontSize: 11.5, color: T.dim }}
+            >
+              clear
+            </span>
+            <span
+              className="hc-tabtn"
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); window.troveTerminal?.popOut(); }}
+              onKeyDown={(e) => e.key === 'Enter' && window.troveTerminal?.popOut()}
+              title="Open the terminal in its own window"
+              style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: T.dim }}
+            >
+              pop out
+              <PopOut />
+            </span>
+          </>
         )}
         <span
           className="hc-tabtn"
@@ -162,15 +119,25 @@ export function Console() {
         </span>
       </div>
 
-      {/* TERMINAL */}
-      {hasShell ? (
-        <div ref={mountRef} className="hc-term" style={{ flex: 1, minHeight: 0, padding: '8px 10px 4px', overflow: 'hidden' }} />
-      ) : (
+      {/* BODY */}
+      {!hasShell ? (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 24, color: T.dim, fontSize: 12.5, lineHeight: 1.6 }}>
           The live terminal runs inside the Trove desktop app.
           <br />
           Launch it with <span style={{ color: T.green }}>npm run dev</span> to use the embedded shell.
         </div>
+      ) : poppedOut ? (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: T.dim, fontSize: 13 }}>
+          <span>Terminal is open in its own window.</span>
+          <button
+            onClick={() => window.troveTerminal?.popIn()}
+            style={{ border: `1px solid ${T.line}`, backgroundColor: T.panel, color: T.text, borderRadius: 9, padding: '8px 16px', fontFamily: mono, fontSize: 12.5, cursor: 'pointer' }}
+          >
+            Bring it back
+          </button>
+        </div>
+      ) : (
+        <TerminalView ref={termRef} className="hc-term" style={{ flex: 1, minHeight: 0, padding: '8px 10px 4px', overflow: 'hidden' }} />
       )}
     </div>
   );

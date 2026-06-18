@@ -3,16 +3,17 @@
 // terminal stays available so you can install from here too.
 
 import { useParams } from 'react-router-dom';
-import { C, mono, sans } from '../tokens';
+import { C, CHIP, mono, sans } from '../tokens';
 import { Nav } from '../components/Nav';
 import {
-  BackArrow, Check, Clock, FileIcon, Fork, IssueDot, License, Play, Star, Watch,
+  BackArrow, Check, Clock, ExternalLink, FileIcon, Fork, GitHubMark, IssueDot, License, Play, Star, Watch,
 } from '../components/icons';
+import { openExternal } from '../lib/external';
+import { Markdown } from '../components/Markdown';
 import { useGithubRepo } from '../lib/useGithub';
 import { useTroveStore } from '../store/useTroveStore';
 import { useNavActions } from '../lib/useNavActions';
 import type { Contributor } from '../data/github';
-import type { Project } from '../types';
 
 function PillBtn({ icon, label, count }: { icon: React.ReactNode; label: string; count: string }) {
   return (
@@ -23,33 +24,6 @@ function PillBtn({ icon, label, count }: { icon: React.ReactNode; label: string;
     </div>
   );
 }
-
-function CodeBlock({ code, label }: { code: string; label: string }) {
-  const dot = { width: 9, height: 9, borderRadius: 9, background: '#3A4150' } as const;
-  return (
-    <div style={{ background: C.sunk, border: `1px solid ${C.line}`, borderRadius: 10, overflow: 'hidden', margin: '14px 0' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 13px', borderBottom: `1px solid ${C.line2}`, background: C.panel }}>
-        <span style={{ display: 'flex', gap: 5 }}>
-          <span style={dot} />
-          <span style={dot} />
-          <span style={dot} />
-        </span>
-        <span style={{ fontFamily: mono, fontSize: 11, color: C.faint, flex: 1 }}>{label}</span>
-        <span style={{ fontFamily: mono, fontSize: 11, color: C.faint }}>copy</span>
-      </div>
-      <pre style={{ margin: 0, padding: '14px 15px', fontFamily: mono, fontSize: 12.5, lineHeight: 1.7, color: C.ink, overflowX: 'auto', whiteSpace: 'pre' }}>
-        {code.split('\n').map((ln, i) => {
-          const isComment = ln.trim().startsWith('#') || ln.trim().startsWith('//');
-          return <div key={i} style={{ color: isComment ? C.faint : C.ink }}>{ln}</div>;
-        })}
-      </pre>
-    </div>
-  );
-}
-
-const H2 = ({ children }: { children: React.ReactNode }) => (
-  <h2 style={{ fontFamily: sans, fontSize: 21, fontWeight: 700, color: C.ink, letterSpacing: -0.4, margin: '30px 0 4px', paddingBottom: 8, borderBottom: `1px solid ${C.line2}` }}>{children}</h2>
-);
 
 function StatRow({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
@@ -74,12 +48,6 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function usageLabel(p: Project) {
-  if (p.lang === 'Python') return 'python';
-  if (p.lang === 'Go') return 'go';
-  return 'shell';
-}
-
 export function Detail() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const { detail, loading, error } = useGithubRepo(owner, repo);
@@ -89,7 +57,10 @@ export function Detail() {
   const open = useTroveStore((s) => s.open);
   const { onHome, onOpenCreator } = useNavActions();
 
-  if (loading) {
+  // Only show the bare loader when there's nothing to paint yet. When we have a
+  // preview (seeded from the list) we render it immediately and let the README
+  // and contributors stream in.
+  if (loading && !detail) {
     return (
       <Shell>
         <div style={{ maxWidth: 1080, margin: '0 auto', padding: '64px 28px', textAlign: 'center', color: C.faint, fontFamily: mono, fontSize: 14 }}>
@@ -99,7 +70,7 @@ export function Detail() {
     );
   }
 
-  if (error || !detail) {
+  if (!detail) {
     return (
       <Shell>
         <div style={{ maxWidth: 1080, margin: '0 auto', padding: '64px 28px', textAlign: 'center', color: C.sub }}>
@@ -110,16 +81,8 @@ export function Detail() {
     );
   }
 
-  const { project: p, contributors, forks, watchers, issues } = detail;
+  const { project: p, contributors, forks, watchers, issues, readme, defaultBranch } = detail;
   const installed = isInstalled(p.id);
-  const features = p.features || [];
-
-  const badges: [string, string, string][] = [
-    ['build', 'passing', C.green],
-    ['language', p.lang, C.blue],
-    ['license', p.license, C.sub],
-    ['stars', p.stars, C.amber],
-  ];
 
   return (
     <Shell>
@@ -137,6 +100,16 @@ export function Detail() {
             <span style={{ color: C.ink, fontWeight: 600 }}>{p.name}</span>
           </span>
           <div style={{ flex: 1 }} />
+          <button
+            className="hd-btn"
+            onClick={() => openExternal(p.htmlUrl)}
+            title="Open the repository on github.com"
+            style={{ display: 'flex', alignItems: 'center', gap: 7, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 9, padding: '7px 12px', fontFamily: sans, fontSize: 13, fontWeight: 600, color: C.sub, cursor: 'pointer' }}
+          >
+            <GitHubMark />
+            View on GitHub
+            <ExternalLink stroke={C.faint} />
+          </button>
           <PillBtn label="Watch" count={watchers} icon={<Watch />} />
           <PillBtn label="Fork" count={forks} icon={<Fork />} />
           <div className="hd-btn" style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'rgba(227,179,65,.12)', border: '1px solid rgba(227,179,65,.3)', borderRadius: 9, padding: '7px 12px', fontFamily: sans, fontSize: 13, fontWeight: 700, color: C.amber }}>
@@ -174,47 +147,14 @@ export function Detail() {
               <span style={{ fontFamily: mono, fontSize: 13, color: C.sub, fontWeight: 500 }}>README.md</span>
             </div>
 
-            <h1 style={{ fontFamily: sans, fontSize: 28, fontWeight: 800, letterSpacing: -0.6, color: C.ink, margin: '20px 0 14px' }}>{p.name}</h1>
-
-            {/* badges */}
-            <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 18 }}>
-              {badges.map(([a, b, col]) => (
-                <span key={a} style={{ display: 'inline-flex', fontFamily: mono, fontSize: 11, borderRadius: 5, overflow: 'hidden', border: `1px solid ${C.line}`, whiteSpace: 'nowrap' }}>
-                  <span style={{ background: C.sunk, color: C.faint, padding: '3px 8px' }}>{a}</span>
-                  <span style={{ background: 'rgba(255,255,255,.04)', color: col, padding: '3px 8px', fontWeight: 600 }}>{b}</span>
-                </span>
-              ))}
-            </div>
-
-            <p style={{ fontFamily: sans, fontSize: 15.5, lineHeight: 1.7, color: C.body, margin: '0 0 6px', textWrap: 'pretty' as React.CSSProperties['textWrap'] }}>{p.about || p.desc}</p>
-
-            {features.length > 0 && (
-              <>
-                <H2>Highlights</H2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
-                  {features.map((f, i) => (
-                    <div key={i} style={{ display: 'flex', gap: 11, alignItems: 'flex-start' }}>
-                      <span style={{ marginTop: 1, flexShrink: 0, width: 18, height: 18, borderRadius: 18, background: 'rgba(63,185,80,.14)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Check s={10} w={2} />
-                      </span>
-                      <span style={{ fontFamily: sans, fontSize: 14.5, lineHeight: 1.5, color: C.body }}>{f}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
+            {/* The real README, rendered faithfully. */}
+            {readme ? (
+              <Markdown md={readme} owner={p.owner} repo={p.name} branch={defaultBranch} />
+            ) : loading ? (
+              <div style={{ padding: '36px 0', textAlign: 'center', color: C.faint, fontFamily: mono, fontSize: 13 }}>loading README…</div>
+            ) : (
+              <p style={{ fontFamily: sans, fontSize: 15, lineHeight: 1.7, color: C.body, margin: '14px 0' }}>{p.blurb}</p>
             )}
-
-            <H2>Install</H2>
-            <p style={{ fontFamily: sans, fontSize: 14.5, lineHeight: 1.6, color: C.sub, margin: '14px 0 0' }}>
-              Hit <span style={{ color: C.green, fontWeight: 600 }}>run</span> in the sidebar to install it right here in the embedded terminal.
-            </p>
-            <CodeBlock code={p.install} label="install" />
-
-            <H2>Usage</H2>
-            <CodeBlock code={p.usage || p.install} label={usageLabel(p)} />
-
-            <H2>Requirements</H2>
-            <p style={{ fontFamily: sans, fontSize: 14.5, lineHeight: 1.6, color: C.body, margin: '14px 0 0' }}>{p.requires}</p>
 
             <div style={{ marginTop: 28, paddingTop: 16, borderTop: `1px solid ${C.line2}`, fontFamily: sans, fontSize: 13, color: C.faint }}>
               {p.license !== 'No license' && <>Released under the <span style={{ color: C.sub, fontWeight: 600 }}>{p.license}</span> license · </>}
@@ -243,13 +183,13 @@ export function Detail() {
                   title="Run in the embedded terminal"
                   aria-label={`Run ${p.install}`}
                   onClick={() => install(p)}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, background: C.sunk, border: `1px solid ${C.line}`, borderRadius: 9, padding: '9px 9px 9px 12px', textAlign: 'left' }}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, background: CHIP.bg, border: `1px solid ${CHIP.border}`, borderRadius: 9, padding: '9px 9px 9px 12px', textAlign: 'left' }}
                 >
                   <span style={{ fontFamily: mono, fontSize: 12, color: C.green, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
-                    <span style={{ color: C.faint }}>$ </span>
+                    <span style={{ color: '#6E7681' }}>$ </span>
                     {p.install}
                   </span>
-                  <span className="hd-run" style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: mono, fontSize: 11, fontWeight: 600, color: C.ink, background: 'rgba(255,255,255,.06)', borderRadius: 6, padding: '4px 10px', flexShrink: 0 }}>
+                  <span className="hd-run" style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: mono, fontSize: 11, fontWeight: 600, color: '#E7EAEF', background: 'rgba(255,255,255,.06)', borderRadius: 6, padding: '4px 10px', flexShrink: 0 }}>
                     <Play />
                     run
                   </span>

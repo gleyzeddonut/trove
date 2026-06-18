@@ -6,6 +6,34 @@
 import { create } from 'zustand';
 import type { Project, TypeFilter } from '../types';
 import type { UpdateState } from '../global';
+import { fetchAuthedUser, uninstallCommandFor, type Account } from '../data/github';
+import { CONSOLE_MIN_H, CONSOLE_OPEN_H } from '../tokens';
+import {
+  applyTheme,
+  loadSettings,
+  persistSettings,
+  SETTINGS_DEFAULTS,
+  type TroveSettings,
+} from '../lib/settings';
+
+const LS_TOKEN = 'trove.ghtoken';
+const hasToken = (): boolean => {
+  try {
+    return !!localStorage.getItem(LS_TOKEN) || !!window.troveEnv?.githubToken;
+  } catch {
+    return false;
+  }
+};
+
+const LS_HEIGHT = 'trove.consoleHeight';
+const loadHeight = (): number => {
+  try {
+    const n = parseInt(localStorage.getItem(LS_HEIGHT) || '', 10);
+    return Number.isFinite(n) && n >= CONSOLE_MIN_H ? n : CONSOLE_OPEN_H;
+  } catch {
+    return CONSOLE_OPEN_H;
+  }
+};
 
 const LS = 'trove.installed.v1';
 const LS_FOLLOW = 'trove.following.v1';
@@ -56,6 +84,10 @@ interface TroveState {
   typeFilter: TypeFilter;
   installed: Project[];
   consoleOpen: boolean;
+  /** Dock height in px (vertically resizable), persisted. */
+  consoleHeight: number;
+  /** True when the terminal is in its own window. */
+  poppedOut: boolean;
   /** Followed creator handles, persisted. */
   following: string[];
   /** Liked activity-post ids, session-only. */
@@ -64,11 +96,32 @@ interface TroveState {
   update: UpdateState;
   /** Whether to auto-install once the requested update finishes downloading. */
   installOnReady: boolean;
+  /** User settings (appearance / install / feed / …), persisted. */
+  settings: TroveSettings;
+  /** The connected GitHub account (from the token), or null. */
+  account: Account | null;
+  connecting: boolean;
+  /** Transient connect-token input — kept here so it survives a theme remount. */
+  connectToken: string;
+  /** Bumped to force a re-skin remount on live theme/accent changes. */
+  themeTick: number;
+
+  setSetting: <K extends keyof TroveSettings>(key: K, value: TroveSettings[K]) => void;
+  resetSettings: () => void;
+  reloadSettings: () => void;
+  bumpTheme: () => void;
+  setConnectToken: (v: string) => void;
+  connectGithub: (token: string) => Promise<void>;
+  disconnectGithub: () => void;
+  hydrateAccount: () => Promise<void>;
+  clearLibrary: () => void;
 
   setQuery: (q: string) => void;
   setType: (t: TypeFilter) => void;
   setConsoleOpen: (open: boolean) => void;
   toggleConsole: () => void;
+  setConsoleHeight: (h: number) => void;
+  setPoppedOut: (v: boolean) => void;
 
   isFollowing: (handle: string) => boolean;
   toggleFollow: (handle: string) => void;
@@ -93,10 +146,99 @@ export const useTroveStore = create<TroveState>((set, get) => ({
   typeFilter: 'All',
   installed: loadInstalled(),
   consoleOpen: false,
+  consoleHeight: loadHeight(),
+  poppedOut: false,
   following: loadFollowing(),
   liked: [],
   update: { status: 'idle' },
   installOnReady: false,
+  settings: loadSettings(),
+  account: null,
+  connecting: false,
+  connectToken: '',
+  themeTick: 0,
+
+  setConnectToken: (v) => set({ connectToken: v }),
+
+  setSetting: (key, value) =>
+    set((s) => {
+      const next = { ...s.settings, [key]: value };
+      persistSettings(next);
+      if (key === 'theme' || key === 'accent' || key === 'density') {
+        applyTheme(next);
+        // Density applies purely via CSS ([data-density]); only theme/accent
+        // need a remount to re-resolve inline var() colors.
+        return key === 'density' ? { settings: next } : { settings: next, themeTick: s.themeTick + 1 };
+      }
+      return { settings: next };
+    }),
+  resetSettings: () =>
+    set((s) => {
+      persistSettings(SETTINGS_DEFAULTS);
+      applyTheme(SETTINGS_DEFAULTS);
+      return { settings: { ...SETTINGS_DEFAULTS }, themeTick: s.themeTick + 1 };
+    }),
+  // Re-read settings from storage and apply — used to sync theme across windows
+  // (the popped-out terminal) via the localStorage `storage` event.
+  reloadSettings: () =>
+    set((s) => {
+      const next = loadSettings();
+      applyTheme(next);
+      return { settings: next, themeTick: s.themeTick + 1 };
+    }),
+  bumpTheme: () => set((s) => ({ themeTick: s.themeTick + 1 })),
+
+  connectGithub: async (token) => {
+    const t = token.trim();
+    if (!t) return;
+    try {
+      localStorage.setItem(LS_TOKEN, t);
+    } catch {
+      /* ignore */
+    }
+    set({ connecting: true });
+    try {
+      const account = await fetchAuthedUser();
+      set({ account, connecting: false });
+    } catch {
+      // bad token — roll back so the UI doesn't show a false "connected" state
+      try {
+        localStorage.removeItem(LS_TOKEN);
+      } catch {
+        /* ignore */
+      }
+      set({ account: null, connecting: false });
+      // If an env-provided token still works, restore the connected account.
+      get().hydrateAccount();
+    }
+  },
+  disconnectGithub: () => {
+    try {
+      localStorage.removeItem(LS_TOKEN);
+    } catch {
+      /* ignore */
+    }
+    set({ account: null });
+  },
+  hydrateAccount: async () => {
+    if (!hasToken() || get().account) return;
+    try {
+      const account = await fetchAuthedUser();
+      set({ account });
+    } catch {
+      /* token absent or invalid */
+    }
+  },
+  clearLibrary: () => {
+    const items = get().installed;
+    if (items.length === 0) return;
+    saveInstalled([]);
+    set({ installed: [], consoleOpen: true });
+    for (const p of items) {
+      const cmd = uninstallCommandFor(p.install);
+      if (cmd) runInTerminal(cmd);
+    }
+  },
 
   setUpdate: (u) => set({ update: u }),
   startUpdate: () => {
@@ -108,6 +250,16 @@ export const useTroveStore = create<TroveState>((set, get) => ({
   setType: (t) => set({ typeFilter: t }),
   setConsoleOpen: (open) => set({ consoleOpen: open }),
   toggleConsole: () => set((s) => ({ consoleOpen: !s.consoleOpen })),
+  setConsoleHeight: (h) => {
+    const next = Math.max(CONSOLE_MIN_H, Math.round(h));
+    try {
+      localStorage.setItem(LS_HEIGHT, String(next));
+    } catch {
+      /* ignore */
+    }
+    set({ consoleHeight: next });
+  },
+  setPoppedOut: (v) => set({ poppedOut: v }),
 
   isFollowing: (handle) => get().following.includes(handle),
   toggleFollow: (handle) =>
@@ -127,7 +279,12 @@ export const useTroveStore = create<TroveState>((set, get) => ({
   isInstalled: (id) => get().installed.some((p) => p.id === id),
 
   install: (p) => {
-    set({ consoleOpen: true });
+    // Optional safety check before running a real command in the shell.
+    if (get().settings.confirmInstall) {
+      const ok = typeof window !== 'undefined' && window.confirm(`Run this in the terminal?\n\n${p.install}`);
+      if (!ok) return;
+    }
+    if (get().settings.autoConsole) set({ consoleOpen: true });
     if (!get().installed.some((x) => x.id === p.id)) {
       set((s) => {
         const next = [...s.installed, p];
@@ -145,6 +302,13 @@ export const useTroveStore = create<TroveState>((set, get) => ({
       saveInstalled(next);
       return { installed: next };
     });
+    // Run the real uninstall command in the terminal when there is one;
+    // otherwise (git clone / npx / docker / …) just dropping it is the action.
+    const cmd = uninstallCommandFor(p.install);
+    if (cmd) {
+      set({ consoleOpen: true });
+      runInTerminal(cmd);
+    }
   },
 
   open: (p) => {

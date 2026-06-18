@@ -160,12 +160,40 @@ function tagFor(repo: GhRepo): string {
 // varied commands (brew / cargo / pip / npm / go install / gem). The guessed
 // package name usually matches the repo name; for anything we can't map
 // confidently we fall back to `git clone`, which always works.
+// The user's "Default package manager" preference (Settings), read from the
+// persisted settings so the data layer needn't be threaded through React.
+function preferredPkg(): string {
+  try {
+    const s = JSON.parse(localStorage.getItem('trove.settings.v1') || '{}');
+    return typeof s?.pkg === 'string' ? s.pkg : 'auto';
+  } catch {
+    return 'auto';
+  }
+}
+
 function installFor(repo: GhRepo): string {
   const owner = repo.owner.login;
   const pkg = repo.name.toLowerCase();
   const topics = (repo.topics || []).map((t) => t.toLowerCase());
   const isCli = topics.some((t) => ['cli', 'command-line', 'commandline', 'terminal'].includes(t));
   const wantsBrew = topics.includes('homebrew') || topics.includes('macos');
+
+  // An explicit preference overrides the language-based guess (README-derived
+  // commands still take priority on the detail page — this is only the guess).
+  switch (preferredPkg()) {
+    case 'npm':
+      return `npm install ${pkg}`;
+    case 'pnpm':
+      return `pnpm add ${pkg}`;
+    case 'brew':
+      return `brew install ${pkg}`;
+    case 'cargo':
+      return `cargo install ${pkg}`;
+    case 'pip':
+      return `pip install ${pkg}`;
+    default:
+      break; // 'auto' → fall through to language heuristic
+  }
 
   switch (repo.language) {
     case 'Go':
@@ -192,9 +220,66 @@ function installFor(repo: GhRepo): string {
   }
 }
 
+/**
+ * Mirror of an install command → the command that removes it. Returns
+ * undefined when there's nothing persistent to uninstall (git clone, npx,
+ * docker, go install, …) — in that case we just drop it from the library.
+ */
+export function uninstallCommandFor(install: string): string | undefined {
+  let tokens = install.trim().split(/\s+/);
+  let sudo = '';
+  if (tokens[0] === 'sudo') {
+    sudo = 'sudo ';
+    tokens = tokens.slice(1);
+  }
+  const tool = tokens[0];
+  const last = tokens[tokens.length - 1];
+  const pkg = last && !last.startsWith('-') ? last : undefined;
+  const global = tokens.includes('-g') || tokens.includes('--global');
+  if (!pkg) return undefined;
+
+  switch (tool) {
+    case 'npm':
+      return `npm uninstall ${global ? '-g ' : ''}${pkg}`;
+    case 'pnpm':
+      return `pnpm remove ${global ? '-g ' : ''}${pkg}`;
+    case 'yarn':
+      return `yarn ${tokens[1] === 'global' ? 'global ' : ''}remove ${pkg}`;
+    case 'pip':
+    case 'pip3':
+      return `${tool} uninstall -y ${pkg}`;
+    case 'pipx':
+      return `pipx uninstall ${pkg}`;
+    case 'brew':
+      return `brew uninstall ${install.includes('--cask') ? '--cask ' : ''}${pkg}`;
+    case 'cargo':
+      return `cargo uninstall ${pkg}`;
+    case 'gem':
+      return `gem uninstall ${pkg}`;
+    case 'apt':
+    case 'apt-get':
+      return `${sudo}${tool} remove ${pkg}`;
+    case 'gh':
+      return tokens[1] === 'extension' ? `gh extension remove ${pkg}` : undefined;
+    case 'python':
+    case 'python3':
+      return tokens[1] === '-m' && tokens[2] === 'pip' ? `${tool} -m pip uninstall -y ${pkg}` : undefined;
+    default:
+      return undefined; // npx / go / docker / git / open / deno …
+  }
+}
+
+// Cache mapped projects (by owner/name) so the detail page can paint instantly
+// from the data the list already fetched, while the full detail streams in.
+const projectCache = new Map<string, Project>();
+
+export function cachedProject(owner: string, name: string): Project | undefined {
+  return projectCache.get(`${owner}/${name}`.toLowerCase());
+}
+
 function mapRepo(repo: GhRepo): Project {
   const { cover, accent } = coverFor(repo.full_name);
-  return {
+  const project: Project = {
     id: repo.full_name,
     name: repo.name,
     owner: repo.owner.login,
@@ -212,6 +297,7 @@ function mapRepo(repo: GhRepo): Project {
     license: licenseOf(repo),
     topics: repo.topics || [],
     forksNum: repo.forks_count,
+    htmlUrl: repo.html_url,
     cover,
     accent,
     install: installFor(repo),
@@ -221,6 +307,8 @@ function mapRepo(repo: GhRepo): Project {
     usage: '',
     requires: '',
   };
+  projectCache.set(project.id.toLowerCase(), project);
+  return project;
 }
 
 // --- README parsing (best-effort) -----------------------------------------
@@ -276,6 +364,48 @@ function parseReadme(md: string): Pick<Project, 'about' | 'features' | 'usage'> 
   return { about, features, usage };
 }
 
+// Pull the *real* install command out of the README — prefer a code block
+// under an "Install"/"Getting started" heading, else the first package-manager
+// line in any code block. Returns undefined if nothing recognizable is found.
+const PKG_CMD =
+  /^\s*\$?\s*(sudo\s+)?((npm|pnpm|yarn|npx|pip3?|pipx|brew|cargo|go|gem|apt(-get)?|docker|nix(-env)?|conda|uv|bun|deno|scoop|choco|winget|gh)\b|python3?\s+-m\s+pip\b)/;
+const cleanCmd = (s: string) => s.replace(/^\s*\$\s?/, '').replace(/^\s*>\s?/, '').trim();
+
+function extractInstall(md: string): string | undefined {
+  const lines = md.split('\n');
+
+  // 1) first code block following an install-ish heading
+  const headingIdx = lines.findIndex((l) =>
+    /^#{1,6}\s+.*(install|installation|getting started|setup|quick ?start)/i.test(l),
+  );
+  if (headingIdx >= 0) {
+    for (let i = headingIdx + 1; i < lines.length; i++) {
+      if (/^```/.test(lines[i].trim())) {
+        for (let j = i + 1; j < lines.length && !/^```/.test(lines[j].trim()); j++) {
+          const cmd = cleanCmd(lines[j]);
+          if (PKG_CMD.test(cmd)) return cmd.slice(0, 160);
+        }
+        break;
+      }
+      if (/^#{1,3}\s/.test(lines[i])) break; // hit the next major section
+    }
+  }
+
+  // 2) fallback: first package-manager line in any fenced code block
+  let inFence = false;
+  for (const raw of lines) {
+    if (/^```/.test(raw.trim())) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) {
+      const cmd = cleanCmd(raw);
+      if (PKG_CMD.test(cmd)) return cmd.slice(0, 160);
+    }
+  }
+  return undefined;
+}
+
 // --- Public API -----------------------------------------------------------
 
 export interface SearchPage {
@@ -305,46 +435,65 @@ export interface RepoDetail {
   forks: string;
   watchers: string;
   issues: string;
+  /** Raw README markdown (rendered faithfully on the detail page). */
+  readme: string;
+  /** Default branch, for resolving relative README links/images. */
+  defaultBranch: string;
+}
+
+// Session cache so revisiting a detail page is instant.
+const repoDetailCache = new Map<string, RepoDetail>();
+
+export function cachedRepoDetail(owner: string, name: string): RepoDetail | undefined {
+  return repoDetailCache.get(`${owner}/${name}`.toLowerCase());
+}
+
+/**
+ * Build a partial detail from a project the list already fetched, so the detail
+ * page can render its header/sidebar immediately while the full data loads.
+ */
+export function previewDetail(project: Project): RepoDetail {
+  return { project, contributors: [], forks: k(project.forksNum), watchers: '—', issues: '—', readme: '', defaultBranch: 'HEAD' };
 }
 
 /** Full detail for one repo: metadata + README content + top contributors. */
 export async function fetchRepo(owner: string, name: string): Promise<RepoDetail> {
-  const repo = await ghJson<GhRepo>(`/repos/${owner}/${name}`);
-  const project = mapRepo(repo);
+  // Fire all three requests at once instead of in sequence.
+  const [repo, md, contribList] = await Promise.all([
+    ghJson<GhRepo>(`/repos/${owner}/${name}`),
+    fetch(`${API}/repos/${owner}/${name}/readme`, { headers: headers('application/vnd.github.raw') })
+      .then((r) => (r.ok ? r.text() : ''))
+      .catch(() => ''),
+    ghJson<{ login: string; avatar_url: string; html_url: string }[]>(`/repos/${owner}/${name}/contributors?per_page=18`)
+      .catch(() => [] as { login: string; avatar_url: string; html_url: string }[]),
+  ]);
 
-  // README (raw text) — tolerate repos without one.
-  try {
-    const res = await fetch(`${API}/repos/${owner}/${name}/readme`, {
-      headers: headers('application/vnd.github.raw'),
-    });
-    if (res.ok) {
-      const md = await res.text();
-      Object.assign(project, parseReadme(md));
-    }
-  } catch {
-    /* no readme */
+  const project = mapRepo(repo);
+  if (md) {
+    Object.assign(project, parseReadme(md));
+    const realInstall = extractInstall(md); // prefer the README's real command
+    if (realInstall) project.install = realInstall;
   }
   if (!project.about) project.about = project.desc || 'No description provided.';
   if (!project.requires) project.requires = project.lang !== '—' ? `Built with ${project.lang}.` : 'See the repository for details.';
 
-  // top contributors (real avatars) — tolerate failure.
-  let contributors: Contributor[] = [];
-  try {
-    const list = await ghJson<{ login: string; avatar_url: string; html_url: string }[]>(
-      `/repos/${owner}/${name}/contributors?per_page=18`,
-    );
-    contributors = (list || []).map((c) => ({ login: c.login, avatarUrl: c.avatar_url, htmlUrl: c.html_url }));
-  } catch {
-    /* ignore */
-  }
+  const contributors: Contributor[] = (contribList || []).map((c) => ({
+    login: c.login,
+    avatarUrl: c.avatar_url,
+    htmlUrl: c.html_url,
+  }));
 
-  return {
+  const detail: RepoDetail = {
     project,
     contributors,
     forks: k(repo.forks_count),
     watchers: k(repo.subscribers_count ?? Math.round(repo.stargazers_count / 41)),
     issues: k(repo.open_issues_count ?? 0),
+    readme: md,
+    defaultBranch: repo.default_branch || 'HEAD',
   };
+  repoDetailCache.set(`${owner}/${name}`.toLowerCase(), detail);
+  return detail;
 }
 
 // --- Social layer: creators, profiles, activity feed ----------------------
@@ -410,6 +559,26 @@ function mapUser(u: GhUser): Creator {
 
 export async function fetchUser(handle: string): Promise<Creator> {
   return mapUser(await ghJson<GhUser>(`/users/${handle}`));
+}
+
+export interface Account {
+  login: string;
+  name: string;
+  email: string;
+  avatarUrl: string;
+  cover: string;
+}
+
+/** The user the current token authenticates as (GET /user). */
+export async function fetchAuthedUser(): Promise<Account> {
+  const u = await ghJson<GhUser & { email: string | null }>(`/user`);
+  return {
+    login: u.login,
+    name: u.name || u.login,
+    email: u.email || '',
+    avatarUrl: u.avatar_url,
+    cover: coverFor(u.login).cover,
+  };
 }
 
 /** Best-effort batch of user profiles; failures are dropped. */
@@ -535,12 +704,14 @@ export interface FeedData {
  * with none, it falls back to the suggested community. The left rail needs
  * profiles for both the followed and suggested handles.
  */
-export async function fetchFeed(following: string[]): Promise<FeedData> {
+export async function fetchFeed(following: string[], scope: 'following' | 'all' = 'following'): Promise<FeedData> {
   const followed = following.slice();
   const suggested = SUGGESTED_CREATORS.filter((h) => !following.includes(h)).slice(0, 5);
   // Pull from more sources than we show on the left, since activity yield per
   // maker varies (some recent activity is all on other people's repos).
-  const activitySources = (followed.length ? followed : SUGGESTED_CREATORS).slice(0, 8);
+  // "Everyone" scope always shows the wider community; "following" prefers your
+  // follows (falling back to the community when you follow no one).
+  const activitySources = (scope === 'all' || followed.length === 0 ? SUGGESTED_CREATORS : followed).slice(0, 8);
 
   const railHandles = Array.from(new Set([...followed, ...suggested]));
   const [railCreators, sourceCreators] = await Promise.all([
