@@ -1,0 +1,218 @@
+/* Global reset + interaction styles. Static styling lives inline on components
+   (faithfully ported from the design handoff); hover/focus/animation states
+   that can't be inlined live here. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+body {
+  background: #0a0c10;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+/* --- Storefront / rows --------------------------------------------------- */
+.hs-row {
+  transition: background 0.15s, border-color 0.15s, transform 0.12s;
+}
+.hs-row:hover {
+  background: #181d25;
+  border-color: #2b3340;
+}
+.hs-cmd {
+  transition: background 0.15s, border-color 0.15s;
+  cursor: pointer;
+}
+.hs-cmd:hover {
+  background: #0d0f14;
+  border-color: #3fb95066;
+}
+.hs-cmd:hover .hs-run {
+  background: #3fb950;
+  color: #06210e;
+}
+.hs-chip {
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  cursor: pointer;
+}
+.hs-chip:hover {
+  border-color: #3a4150;
+  color: #e7eaef;
+}
+.hs-navlink {
+  transition: background 0.15s, color 0.15s;
+  cursor: pointer;
+}
+.hs-open {
+  transition: background 0.15s;
+  cursor: pointer;
+}
+.hs-open:hover {
+  background: rgba(142, 125, 241, 0.14);
+}
+.hs-uninstall {
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.hs-uninstall:hover {
+  background: rgba(244, 112, 103, 0.12);
+  border-color: rgba(244, 112, 103, 0.4);
+  color: #f47067;
+}
+.hs-caret {
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.hs-caret:hover {
+  background: #0d0f14;
+  border-color: #3a4150;
+  color: #e7eaef;
+}
+
+@keyframes hs-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.hs-spin {
+  animation: hs-spin 0.7s linear infinite;
+}
+
+/* --- Detail page --------------------------------------------------------- */
+.hd-btn {
+  transition: background 0.15s, border-color 0.15s;
+  cursor: pointer;
+}
+.hd-btn:hover {
+  background: #181d25;
+  border-color: #3a4150;
+}
+.hd-cmd {
+  transition: background 0.15s, border-color 0.15s;
+  cursor: pointer;
+}
+.hd-cmd:hover {
+  background: #0d0f14;
+  border-color: #3fb95066;
+}
+.hd-cmd:hover .hd-run {
+  background: #3fb950;
+  color: #06210e;
+}
+.hd-back {
+  transition: color 0.15s;
+  cursor: pointer;
+}
+.hd-back:hover {
+  color: #e7eaef;
+}
+.hd-link {
+  color: #58a6ff;
+  cursor: pointer;
+  text-decoration: none;
+}
+.hd-link:hover {
+  text-decoration: underline;
+}
+
+@keyframes hd-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.hd-spin {
+  animation: hd-spin 0.7s linear infinite;
+}
+
+/* --- Social (feed / creator) --------------------------------------------- */
+.hf-card {
+  transition: border-color 0.15s, background 0.15s;
+}
+.hf-card:hover {
+  border-color: #2b3340;
+}
+.hf-embed {
+  transition: background 0.15s, border-color 0.15s;
+  cursor: pointer;
+}
+.hf-embed:hover {
+  background: #181d25;
+  border-color: #2b3340;
+}
+.hf-follow {
+  transition: filter 0.15s, transform 0.08s, background 0.15s, color 0.15s, border-color 0.15s;
+  cursor: pointer;
+}
+.hf-follow:hover {
+  filter: brightness(1.08);
+}
+.hf-follow:active {
+  transform: scale(0.96);
+}
+.hf-eng {
+  transition: color 0.15s, background 0.15s;
+  cursor: pointer;
+}
+.hf-eng:hover {
+  color: #e7eaef;
+  background: rgba(255, 255, 255, 0.04);
+}
+.hf-name {
+  cursor: pointer;
+}
+.hf-name:hover {
+  text-decoration: underline;
+}
+
+/* --- Console ------------------------------------------------------------- */
+.hc-term {
+  /* xterm sizes itself to this container via the fit addon */
+}
+.hc-term .xterm-viewport::-webkit-scrollbar {
+  width: 9px;
+}
+.hc-term .xterm-viewport::-webkit-scrollbar-thumb {
+  background: #222836;
+  border-radius: 9px;
+  border: 2px solid #0a0b0e;
+}
+.hc-bar {
+  transition: background 0.15s;
+  cursor: pointer;
+}
+.hc-bar:hover {
+  background: #151a22;
+}
+.hc-tabtn {
+  transition: color 0.12s;
+  cursor: pointer;
+}
+.hc-tabtn:hover {
+  color: #c9d1d9;
+}
+.hc-input {
+  caret-color: #3fb950;
+}
+
+/* Focus rings for accessibility (the prototype had none). */
+:focus-visible {
+  outline: 2px solid #8e7df1;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
