@@ -40,7 +40,15 @@ export function MiniPlayer() {
     document.body.style.userSelect = 'none';
   };
 
-  const src = `https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&rel=0${video.start ? `&start=${video.start}` : ''}`;
+  // Single video → /embed/<id>; playlist-only → /embed/videoseries?list=…
+  const base = 'https://www.youtube-nocookie.com/embed/';
+  const params = new URLSearchParams({ autoplay: '1', rel: '0' });
+  if (video.list) params.set('list', video.list);
+  if (video.start) params.set('start', String(video.start));
+  const src = `${base}${video.id || 'videoseries'}?${params.toString()}`;
+  const watchUrl = video.id
+    ? `https://www.youtube.com/watch?v=${video.id}${video.list ? `&list=${video.list}` : ''}`
+    : `https://www.youtube.com/playlist?list=${video.list}`;
   const place: React.CSSProperties = pos ? { left: pos.left, top: pos.top } : { right: 20, bottom: 56 };
 
   return (
@@ -64,7 +72,7 @@ export function MiniPlayer() {
         <button
           className="hc-tabtn"
           title="Open in browser"
-          onClick={() => openExternal(`https://www.youtube.com/watch?v=${video.id}`)}
+          onClick={() => openExternal(watchUrl)}
           style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6E7681', display: 'flex', alignItems: 'center', padding: 2 }}
         >
           <ExternalLink s={12} />
@@ -79,7 +87,7 @@ export function MiniPlayer() {
         </button>
       </div>
       <iframe
-        key={video.id}
+        key={video.id || video.list}
         src={src}
         title="YouTube video"
         style={{ display: 'block', width: '100%', aspectRatio: '16 / 9', border: 0, background: '#000' }}

@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import type { Project, TypeFilter } from '../types';
 import type { UpdateState } from '../global';
 import { fetchAuthedUser, uninstallCommandFor, type Account } from '../data/github';
+import type { YouTubeRef } from '../lib/youtube';
 import { CONSOLE_MIN_H, CONSOLE_OPEN_H } from '../tokens';
 import {
   applyTheme,
@@ -92,8 +93,8 @@ interface TroveState {
   following: string[];
   /** Liked activity-post ids, session-only. */
   liked: string[];
-  /** Currently-playing YouTube video in the side mini-player, or null. */
-  video: { id: string; start?: number } | null;
+  /** Currently-playing YouTube video/playlist in the side mini-player, or null. */
+  video: YouTubeRef | null;
   /** Auto-update status (driven by the main process). */
   update: UpdateState;
   /** Whether to auto-install once the requested update finishes downloading. */
@@ -129,7 +130,7 @@ interface TroveState {
   toggleFollow: (handle: string) => void;
   isLiked: (id: string) => boolean;
   toggleLike: (id: string) => void;
-  playVideo: (id: string, start?: number) => void;
+  playVideo: (ref: YouTubeRef) => void;
   closeVideo: () => void;
 
   setUpdate: (u: UpdateState) => void;
@@ -280,7 +281,7 @@ export const useTroveStore = create<TroveState>((set, get) => ({
     set((s) => ({
       liked: s.liked.includes(id) ? s.liked.filter((x) => x !== id) : [...s.liked, id],
     })),
-  playVideo: (id, start) => set({ video: { id, start } }),
+  playVideo: (ref) => set({ video: ref }),
   closeVideo: () => set({ video: null }),
 
   isInstalled: (id) => get().installed.some((p) => p.id === id),

@@ -78,7 +78,7 @@ export function Markdown({ md, owner, repo, branch }: { md: string; owner: strin
             const route = githubRoute(href);
             if (route) return navigate(route);
             const yt = youtubeRef(href);
-            if (yt) return playVideo(yt.id, yt.start);
+            if (yt) return playVideo(yt);
             openExternal(href);
           }}
         >
