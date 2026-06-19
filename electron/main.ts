@@ -99,11 +99,20 @@ function createWindow() {
     minHeight: 640,
     backgroundColor: '#0A0C10',
     title: 'Trove',
+    // Frameless title bar so the renderer's tab strip "owns" the top of the
+    // window; the native traffic lights are positioned to sit inside the Trove
+    // app zone (see BrowserChrome LIGHTS_W).
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 16, y: 15 },
     webPreferences: {
       preload: path.join(app.getAppPath(), 'dist-electron/preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      // Enables the in-app browser dock (<webview>). The webview itself runs
+      // with no preload / no node integration, so embedded pages can't reach
+      // the shell bridges.
+      webviewTag: true,
     },
   });
 
@@ -111,6 +120,14 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  // Harden the in-app browser dock: webviews must never receive a preload or
+  // node access (so embedded pages stay sandboxed from the shell bridges).
+  win.webContents.on('will-attach-webview', (_e, webPreferences) => {
+    delete webPreferences.preload;
+    webPreferences.nodeIntegration = false;
+    webPreferences.contextIsolation = true;
   });
 
   startPty();
@@ -181,6 +198,19 @@ ipcMain.on('terminal:popin', () => {
 
 ipcMain.handle('app:version', () => app.getVersion());
 
+// YouTube oEmbed (no CORS in the main process) — title + channel for the dock's
+// video meta + "Up next" queue. Returns null on any failure.
+ipcMain.handle('youtube:meta', async (_e, watchUrl: string) => {
+  try {
+    const res = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(watchUrl)}`);
+    if (!res.ok) return null;
+    const j = (await res.json()) as { title?: string; author_name?: string };
+    return { title: j.title || '', author: j.author_name || '' };
+  } catch {
+    return null;
+  }
+});
+
 ipcMain.on('pty:resize', (_e, size: { cols: number; rows: number }) => {
   if (ptyProcess && size.cols > 0 && size.rows > 0) ptyProcess.resize(size.cols, size.rows);
 });
@@ -199,6 +229,19 @@ ipcMain.on('updater:download', () => {
 });
 ipcMain.on('updater:install', () => {
   autoUpdater.quitAndInstall(false, true);
+});
+
+// Links inside a web tab that try to open a new window (target=_blank,
+// window.open) become new Trove browser tabs instead of unmanaged windows.
+app.on('web-contents-created', (_e, contents) => {
+  if (contents.getType() === 'webview') {
+    contents.setWindowOpenHandler(({ url }) => {
+      const host = contents.hostWebContents;
+      if (host && !host.isDestroyed()) host.send('browser:new-tab', url);
+      else shell.openExternal(url);
+      return { action: 'deny' };
+    });
+  }
 });
 
 app.whenReady().then(createWindow);

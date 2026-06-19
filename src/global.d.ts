@@ -35,11 +35,21 @@ export interface TroveUpdaterApi {
   getVersion(): Promise<string>;
 }
 
+export interface TroveYouTubeApi {
+  meta(watchUrl: string): Promise<{ title: string; author: string } | null>;
+}
+
+export interface TroveBrowserApi {
+  onNewTab(cb: (url: string) => void): () => void;
+}
+
 declare global {
   interface Window {
     troveTerminal?: TroveTerminalApi;
     troveEnv?: { githubToken: string };
     troveUpdater?: TroveUpdaterApi;
+    troveYouTube?: TroveYouTubeApi;
+    troveBrowser?: TroveBrowserApi;
   }
 }
 

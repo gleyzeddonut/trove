@@ -6,6 +6,7 @@ import { C, mono, sans } from '../tokens';
 import { Nav, type NavItem } from '../components/Nav';
 import { TypeChip } from '../components/TypeChip';
 import { ProjectRow } from '../components/ProjectRow';
+import { SortMenu } from '../components/SortMenu';
 import { Box, SearchIcon } from '../components/icons';
 import { TROVE_TYPES } from '../data/constants';
 import { troveMatch } from '../data/match';
@@ -16,6 +17,14 @@ import type { Project, TypeFilter } from '../types';
 
 const TYPES: TypeFilter[] = ['All', ...TROVE_TYPES];
 
+// Library sorting is local. "Recent" = most-recently installed first (the
+// installed array is append-ordered).
+function sortLibrary(items: Project[], sort: 'recent' | 'stars' | 'name'): Project[] {
+  if (sort === 'recent') return [...items].reverse();
+  if (sort === 'stars') return [...items].sort((a, b) => b.starsNum - a.starsNum);
+  return [...items].sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
   const isLib = mode === 'library';
 
@@ -23,26 +32,34 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
   const setQuery = useTroveStore((s) => s.setQuery);
   const typeFilter = useTroveStore((s) => s.typeFilter);
   const setType = useTroveStore((s) => s.setType);
+  const discoverSort = useTroveStore((s) => s.discoverSort);
+  const setDiscoverSort = useTroveStore((s) => s.setDiscoverSort);
+  const librarySort = useTroveStore((s) => s.librarySort);
+  const setLibrarySort = useTroveStore((s) => s.setLibrarySort);
   const installed = useTroveStore((s) => s.installed);
-  const consoleOpen = useTroveStore((s) => s.consoleOpen);
-  const toggleConsole = useTroveStore((s) => s.toggleConsole);
   const install = useTroveStore((s) => s.install);
   const open = useTroveStore((s) => s.open);
   const uninstall = useTroveStore((s) => s.uninstall);
 
-  const { onHome, onNav, onOpenDetail } = useNavActions();
+  const { onNav, onOpenDetail } = useNavActions();
 
   // Discover hits GitHub (server-side search); Library is purely local.
-  const { results: remote, total, loading, loadingMore, error, hasMore, loadMore } = useGithubSearch(query, !isLib);
-
   const q = query.trim();
+  // "Best match" (GitHub relevance) only means something with a query; with no
+  // search it'd just be ranking the default popular set, so fall back to stars.
+  const effectiveSort = !q && discoverSort === 'best' ? 'stars' : discoverSort;
+  const { results: remote, total, loading, loadingMore, error, hasMore, loadMore } = useGithubSearch(query, !isLib, effectiveSort);
+
   const installedIds = new Set(installed.map((p) => p.id));
 
-  // Base set per surface. Discover already searched server-side, so we only
-  // apply the type filter client-side; Library filters locally by query+type.
+  // Base set per surface. Discover already searched (and sorted) server-side, so
+  // we only apply the type filter client-side; Library filters locally by
+  // query+type, then sorts by the chosen key.
   const base: Project[] = isLib ? installed : remote;
   const byType = (p: Project) => typeFilter === 'All' || p.type === typeFilter;
-  const results = isLib ? base.filter((p) => troveMatch(p, query, typeFilter)) : base.filter(byType);
+  const results = isLib
+    ? sortLibrary(base.filter((p) => troveMatch(p, query, typeFilter)), librarySort)
+    : base.filter(byType);
 
   const typeCount = (t: TypeFilter) =>
     t === 'All' ? base.length : base.filter((p) => p.type === t).length;
@@ -56,7 +73,7 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
 
   return (
     <div style={{ minHeight: '100%', background: C.bg, fontFamily: sans, color: C.ink }}>
-      <Nav active={activeNav} consoleOpen={consoleOpen} libraryCount={installedCount} onToggleConsole={toggleConsole} onHome={onHome} onNav={onNav} />
+      <Nav active={activeNav} libraryCount={installedCount} onNav={onNav} />
 
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '32px 28px 48px' }}>
         {/* HERO */}
@@ -118,9 +135,29 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
                 <TypeChip key={t} label={t} active={typeFilter === t} count={typeCount(t)} onClick={() => setType(t)} />
               ))}
               <div style={{ flex: 1 }} />
-              <span style={{ fontFamily: sans, fontSize: 13, color: C.faint, fontWeight: 600 }}>
-                Sort: <span style={{ color: C.sub }}>{isLib ? 'Recent ▾' : 'Stars ▾'}</span>
-              </span>
+              {isLib ? (
+                <SortMenu
+                  value={librarySort}
+                  onChange={setLibrarySort}
+                  options={[
+                    { value: 'recent', label: 'Recent' },
+                    { value: 'stars', label: 'Stars' },
+                    { value: 'name', label: 'Name' },
+                  ]}
+                />
+              ) : (
+                <SortMenu
+                  value={effectiveSort}
+                  onChange={setDiscoverSort}
+                  options={[
+                    { value: 'stars', label: 'Stars' },
+                    { value: 'forks', label: 'Forks' },
+                    { value: 'updated', label: 'Recently updated' },
+                    // Relevance ranking only applies to an actual search.
+                    ...(q ? [{ value: 'best' as const, label: 'Best match' }] : []),
+                  ]}
+                />
+              )}
             </div>
 
             {/* RESULTS HEADING */}

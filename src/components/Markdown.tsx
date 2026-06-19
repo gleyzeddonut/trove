@@ -4,14 +4,39 @@
 // resolved against the repo so they actually load; code blocks get a working
 // copy button; external links open in the OS browser.
 
-import { useState } from 'react';
+import { createElement, useMemo, useState, isValidElement, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { C, mono } from '../tokens';
+import { C, mono, TABBAR_H } from '../tokens';
 import { githubRoute, openExternal } from '../lib/external';
-import { youtubeRef } from '../lib/youtube';
+import { collectYouTubeRefs, youtubeRef } from '../lib/youtube';
 import { useTroveStore } from '../store/useTroveStore';
+
+// Flatten a heading's children to plain text so we can slug it.
+function textOf(node: ReactNode): string {
+  if (node == null || typeof node === 'boolean') return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join('');
+  if (isValidElement(node)) return textOf((node.props as { children?: ReactNode }).children);
+  return '';
+}
+
+// GitHub-style heading slug (matches github-slugger closely enough for the
+// in-page table-of-contents links READMEs put at the top).
+function slugify(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w\- ]+/g, '')
+    .replace(/\s+/g, '-');
+}
+
+// Give headings ids so README anchor/TOC links have something to jump to.
+const heading = (level: number) =>
+  function H({ children }: { children?: ReactNode }) {
+    return createElement(`h${level}`, { id: slugify(textOf(children)) }, children);
+  };
 
 function makeUrlTransform(owner: string, repo: string, branch: string) {
   return (url: string, key: string): string => {
@@ -65,20 +90,43 @@ function CodeBlock({ code }: { code: string }) {
 export function Markdown({ md, owner, repo, branch }: { md: string; owner: string; repo: string; branch: string }) {
   const navigate = useNavigate();
   const playVideo = useTroveStore((s) => s.playVideo);
+  const openTab = useTroveStore((s) => s.openTab);
+  const hasWebview = typeof window !== 'undefined' && !!window.troveTerminal;
+  // Every YouTube link on this page becomes the dock's "Up next" queue.
+  const videoQueue = useMemo(() => collectYouTubeRefs(md), [md]);
   const components: Components = {
+    h1: heading(1),
+    h2: heading(2),
+    h3: heading(3),
+    h4: heading(4),
+    h5: heading(5),
+    h6: heading(6),
     a({ href, children }) {
       return (
         <a
           href={href}
           onClick={(e) => {
             e.preventDefault();
-            if (!href || href.startsWith('#')) return; // ignore in-page anchors
-            // GitHub repo/user links → native Trove pages; YouTube → side
-            // mini-player; everything else → the OS browser.
+            if (!href) return;
+            // In-page anchor (table of contents) → scroll to the heading,
+            // offset for the fixed tab strip + nav.
+            if (href.startsWith('#')) {
+              const el = document.getElementById(decodeURIComponent(href.slice(1)));
+              if (el) {
+                const y = el.getBoundingClientRect().top + window.scrollY - (TABBAR_H + 72);
+                window.scrollTo({ top: y, behavior: 'smooth' });
+              }
+              return;
+            }
+            // GitHub repo/user links → native Trove pages; YouTube → the dock's
+            // video player; everything else → a new browser tab (or the OS
+            // browser when running outside the desktop app, where there's no
+            // <webview>).
             const route = githubRoute(href);
             if (route) return navigate(route);
             const yt = youtubeRef(href);
-            if (yt) return playVideo(yt);
+            if (yt) return playVideo(yt, videoQueue);
+            if (hasWebview && /^https?:/i.test(href)) return openTab(href);
             openExternal(href);
           }}
         >

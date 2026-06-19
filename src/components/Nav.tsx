@@ -2,9 +2,10 @@
 // count badge of installed items and routes to /library.
 
 import { useNavigate } from 'react-router-dom';
-import { C, mono, sans } from '../tokens';
+import { C, mono, sans, TABBAR_H } from '../tokens';
 import { UpdateButton } from './UpdateButton';
 import { useTroveStore } from '../store/useTroveStore';
+import { useHistoryNav } from '../lib/useHistoryNav';
 
 export type NavItem = 'Discover' | 'Feed' | 'Apps' | 'Tools' | 'Creative' | 'Library';
 
@@ -12,34 +13,47 @@ const ITEMS: NavItem[] = ['Discover', 'Feed', 'Apps', 'Tools', 'Creative', 'Libr
 
 interface NavProps {
   active: NavItem | null;
-  consoleOpen: boolean;
   libraryCount: number;
-  onToggleConsole: () => void;
-  onHome: () => void;
   onNav: (item: NavItem) => void;
 }
 
-export function Nav({ active, consoleOpen, libraryCount, onToggleConsole, onHome, onNav }: NavProps) {
+function NavArrow({ dir, disabled, onClick }: { dir: 'back' | 'forward'; disabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      className="hs-navlink"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={dir === 'back' ? 'Back' : 'Forward'}
+      title={dir === 'back' ? 'Back' : 'Forward'}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30,
+        borderRadius: 8, border: 'none', background: 'transparent',
+        color: disabled ? C.faint : C.sub, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.4 : 1,
+      }}
+    >
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d={dir === 'back' ? 'M15 18l-6-6 6-6' : 'M9 18l6-6-6-6'} />
+      </svg>
+    </button>
+  );
+}
+
+export function Nav({ active, libraryCount, onNav }: NavProps) {
   const navigate = useNavigate();
   const account = useTroveStore((s) => s.account);
+  const { canBack, canForward, back, forward } = useHistoryNav();
   return (
     <div
       style={{
-        position: 'sticky', top: 0, zIndex: 20, height: 60,
+        position: 'sticky', top: TABBAR_H, zIndex: 20, height: 60,
         borderBottom: `1px solid ${C.line2}`, background: 'var(--tv-navbg)',
         backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
         display: 'flex', alignItems: 'center', padding: '0 28px', gap: 24,
       }}
     >
-      <div
-        role="link"
-        tabIndex={0}
-        onClick={onHome}
-        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onHome())}
-        style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}
-      >
-        <img src="./trove-icon.png" alt="" width={25} height={25} style={{ width: 25, height: 25, borderRadius: 7, display: 'block' }} />
-        <span style={{ fontFamily: sans, fontWeight: 800, fontSize: 18, letterSpacing: -0.5, color: C.ink }}>Trove</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: -6 }}>
+        <NavArrow dir="back" disabled={!canBack} onClick={back} />
+        <NavArrow dir="forward" disabled={!canForward} onClick={forward} />
       </div>
 
       <div style={{ display: 'flex', gap: 2 }}>
@@ -78,23 +92,6 @@ export function Nav({ active, consoleOpen, libraryCount, onToggleConsole, onHome
       <div style={{ flex: 1 }} />
 
       <UpdateButton />
-
-      <button
-        className="hs-chip"
-        onClick={onToggleConsole}
-        aria-pressed={consoleOpen}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          background: consoleOpen ? '#000' : C.panel,
-          border: `1px solid ${consoleOpen ? '#2B3340' : C.line}`,
-          borderRadius: 10, padding: '8px 13px', fontFamily: mono, fontSize: 12.5,
-          color: C.green, fontWeight: 600, cursor: 'pointer',
-        }}
-      >
-        <span style={{ width: 7, height: 7, borderRadius: 7, background: C.green, boxShadow: `0 0 7px ${C.green}` }} />
-        console
-        <span style={{ fontFamily: mono, fontSize: 11, color: C.faint, border: `1px solid ${C.line}`, borderRadius: 5, padding: '1px 5px' }}>⌘J</span>
-      </button>
 
       <button
         onClick={() => navigate('/settings')}

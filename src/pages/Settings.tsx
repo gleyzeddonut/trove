@@ -4,7 +4,7 @@
 // reset are wired; the rest persist as preferences.
 
 import { useEffect, useRef, useState } from 'react';
-import { C, mono, sans } from '../tokens';
+import { C, mono, sans, TABBAR_H } from '../tokens';
 import { Nav } from '../components/Nav';
 import { useTroveStore } from '../store/useTroveStore';
 import { useNavActions } from '../lib/useNavActions';
@@ -145,8 +145,6 @@ function UpdatePanel() {
 }
 
 export function Settings() {
-  const consoleOpen = useTroveStore((s) => s.consoleOpen);
-  const toggleConsole = useTroveStore((s) => s.toggleConsole);
   const installedCount = useTroveStore((s) => s.installed.length);
   const s = useTroveStore((st) => st.settings);
   const setSetting = useTroveStore((st) => st.setSetting);
@@ -158,7 +156,7 @@ export function Settings() {
   const disconnectGithub = useTroveStore((st) => st.disconnectGithub);
   const token = useTroveStore((st) => st.connectToken);
   const setToken = useTroveStore((st) => st.setConnectToken);
-  const { onHome, onNav } = useNavActions();
+  const { onNav } = useNavActions();
 
   const set = setSetting as <K extends keyof TroveSettings>(k: K, v: TroveSettings[K]) => void;
   const [active, setActive] = useState('account');
@@ -167,12 +165,12 @@ export function Settings() {
   const go = (id: string) => {
     setActive(id);
     const el = refs.current[id];
-    if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 78, behavior: 'smooth' });
+    if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - (78 + TABBAR_H), behavior: 'smooth' });
   };
 
   useEffect(() => {
     const onScroll = () => {
-      const y = window.scrollY + 120;
+      const y = window.scrollY + 120 + TABBAR_H;
       let cur = SECTIONS[0][0];
       for (const [id] of SECTIONS) {
         const el = refs.current[id];
@@ -193,7 +191,7 @@ export function Settings() {
 
   return (
     <div style={{ minHeight: '100%', background: C.bg, fontFamily: sans, color: C.ink }}>
-      <Nav active={null} consoleOpen={consoleOpen} libraryCount={installedCount} onToggleConsole={toggleConsole} onHome={onHome} onNav={onNav} />
+      <Nav active={null} libraryCount={installedCount} onNav={onNav} />
 
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '30px 28px 56px' }}>
         <h1 style={{ margin: 0, fontSize: 34, fontWeight: 800, letterSpacing: -1.2, lineHeight: 1.05, color: C.ink }}>Settings</h1>
@@ -201,7 +199,7 @@ export function Settings() {
 
         <div style={{ display: 'flex', gap: 32, marginTop: 26, alignItems: 'flex-start' }}>
           {/* LEFT: section nav */}
-          <aside style={{ width: 210, flexShrink: 0, position: 'sticky', top: 80 }}>
+          <aside style={{ width: 210, flexShrink: 0, position: 'sticky', top: 80 + TABBAR_H }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {SECTIONS.map(([id, label, path]) => (
                 <div key={id} className="set-nav" onClick={() => go(id)} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 11px', borderRadius: 10, color: active === id ? C.ink : C.sub, background: active === id ? C.panel : 'transparent', fontWeight: active === id ? 700 : 500, fontSize: 13.5 }}>

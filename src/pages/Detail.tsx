@@ -36,13 +36,11 @@ function StatRow({ label, value, icon }: { label: string; value: string; icon: R
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  const consoleOpen = useTroveStore((s) => s.consoleOpen);
-  const toggleConsole = useTroveStore((s) => s.toggleConsole);
   const installedCount = useTroveStore((s) => s.installed.length);
-  const { onHome, onNav } = useNavActions();
+  const { onNav } = useNavActions();
   return (
     <div style={{ minHeight: '100%', background: C.bg, fontFamily: sans, color: C.ink }}>
-      <Nav active={null} consoleOpen={consoleOpen} libraryCount={installedCount} onToggleConsole={toggleConsole} onHome={onHome} onNav={onNav} />
+      <Nav active={null} libraryCount={installedCount} onNav={onNav} />
       {children}
     </div>
   );

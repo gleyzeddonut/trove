@@ -12,6 +12,7 @@ import {
   previewDetail,
   searchRepos,
   type Contributor,
+  type DiscoverSort,
   type CreatorProfile,
   type FeedData,
   type RepoDetail,
@@ -40,11 +41,11 @@ interface SearchCacheEntry {
 }
 const searchCache = new Map<string, SearchCacheEntry>();
 const FRESH_MS = 5 * 60 * 1000;
-const keyOf = (q: string) => q.trim().toLowerCase();
+const keyOf = (q: string, sort: DiscoverSort) => `${sort}|${q.trim().toLowerCase()}`;
 
-export function useGithubSearch(query: string, enabled: boolean): SearchState {
+export function useGithubSearch(query: string, enabled: boolean, sort: DiscoverSort = 'stars'): SearchState {
   // Seed initial state from cache so a revisit paints with no spinner/flash.
-  const seed = enabled ? searchCache.get(keyOf(query)) : undefined;
+  const seed = enabled ? searchCache.get(keyOf(query, sort)) : undefined;
   const [results, setResults] = useState<Project[]>(seed?.results ?? []);
   const [total, setTotal] = useState(seed?.total ?? 0);
   const [loading, setLoading] = useState(enabled && !seed);
@@ -62,7 +63,7 @@ export function useGithubSearch(query: string, enabled: boolean): SearchState {
       setError(null);
       return;
     }
-    const key = keyOf(query);
+    const key = keyOf(query, sort);
     const token = ++reqRef.current;
     const cached = searchCache.get(key);
 
@@ -76,7 +77,7 @@ export function useGithubSearch(query: string, enabled: boolean): SearchState {
       // …and silently refresh if it's gone stale. Skip when the user has paged
       // past the first page, so a refresh doesn't collapse loaded results.
       if (Date.now() - cached.ts > FRESH_MS && cached.page === 1) {
-        searchRepos(query, 1)
+        searchRepos(query, 1, sort)
           .then(({ items, totalCount }) => {
             if (reqRef.current !== token) return;
             searchCache.set(key, { results: items, total: totalCount, page: 1, ts: Date.now() });
@@ -98,7 +99,7 @@ export function useGithubSearch(query: string, enabled: boolean): SearchState {
     const delay = query.trim() ? 420 : 0;
     const id = window.setTimeout(async () => {
       try {
-        const { items, totalCount } = await searchRepos(query, 1);
+        const { items, totalCount } = await searchRepos(query, 1, sort);
         if (reqRef.current !== token) return;
         searchCache.set(key, { results: items, total: totalCount, page: 1, ts: Date.now() });
         setResults(items);
@@ -113,7 +114,7 @@ export function useGithubSearch(query: string, enabled: boolean): SearchState {
       }
     }, delay);
     return () => window.clearTimeout(id);
-  }, [query, enabled]);
+  }, [query, enabled, sort]);
 
   const loadMore = useCallback(async () => {
     if (loading || loadingMore) return;
@@ -122,12 +123,12 @@ export function useGithubSearch(query: string, enabled: boolean): SearchState {
     const token = reqRef.current;
     setLoadingMore(true);
     try {
-      const { items } = await searchRepos(query, next);
+      const { items } = await searchRepos(query, next, sort);
       if (reqRef.current !== token) return;
       pageRef.current = next;
       setResults((prev) => {
         const merged = [...prev, ...items];
-        const key = keyOf(query);
+        const key = keyOf(query, sort);
         const entry = searchCache.get(key);
         if (entry) searchCache.set(key, { ...entry, results: merged, page: next });
         return merged;
@@ -137,7 +138,7 @@ export function useGithubSearch(query: string, enabled: boolean): SearchState {
     } finally {
       setLoadingMore(false);
     }
-  }, [query, loading, loadingMore]);
+  }, [query, loading, loadingMore, sort]);
 
   const hasMore = !loading && results.length > 0 && results.length < total && pageRef.current < SEARCH_MAX_PAGE;
 

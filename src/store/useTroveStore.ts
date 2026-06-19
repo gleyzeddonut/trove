@@ -6,9 +6,12 @@
 import { create } from 'zustand';
 import type { Project, TypeFilter } from '../types';
 import type { UpdateState } from '../global';
-import { fetchAuthedUser, uninstallCommandFor, type Account } from '../data/github';
+import { fetchAuthedUser, uninstallCommandFor, type Account, type DiscoverSort } from '../data/github';
+
+/** Library list ordering (client-side, since the library is local). */
+export type LibrarySort = 'recent' | 'stars' | 'name';
 import type { YouTubeRef } from '../lib/youtube';
-import { CONSOLE_MIN_H, CONSOLE_OPEN_H } from '../tokens';
+import { CONSOLE_MIN_H, CONSOLE_OPEN_H, DOCK_W_DEFAULT, DOCK_W_MAX, DOCK_W_MIN } from '../tokens';
 import {
   applyTheme,
   loadSettings,
@@ -33,6 +36,37 @@ const loadHeight = (): number => {
     return Number.isFinite(n) && n >= CONSOLE_MIN_H ? n : CONSOLE_OPEN_H;
   } catch {
     return CONSOLE_OPEN_H;
+  }
+};
+
+const LS_DOCK_W = 'trove.video.w';
+const clampDockW = (n: number) => Math.max(DOCK_W_MIN, Math.min(DOCK_W_MAX, Math.round(n)));
+const loadDockWidth = (): number => {
+  try {
+    const n = parseInt(localStorage.getItem(LS_DOCK_W) || '', 10);
+    return Number.isFinite(n) ? clampDockW(n) : DOCK_W_DEFAULT;
+  } catch {
+    return DOCK_W_DEFAULT;
+  }
+};
+
+const LS_DSORT = 'trove.discoverSort.v1';
+const LS_LSORT = 'trove.librarySort.v1';
+const DISCOVER_SORTS: DiscoverSort[] = ['stars', 'forks', 'updated', 'best'];
+const LIBRARY_SORTS: LibrarySort[] = ['recent', 'stars', 'name'];
+const loadEnum = <T extends string>(key: string, allowed: T[], fallback: T): T => {
+  try {
+    const v = localStorage.getItem(key) as T | null;
+    return v && allowed.includes(v) ? v : fallback;
+  } catch {
+    return fallback;
+  }
+};
+const persist = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* ignore */
   }
 };
 
@@ -80,9 +114,25 @@ function runInTerminal(command: string) {
   window.troveTerminal?.run(command);
 }
 
+/** A web tab in the browser chrome. `src` is the (immutable) load URL the
+ *  <webview> mounts with; `url` tracks the live location for the address bar. */
+export interface BrowserTab {
+  id: string;
+  src: string; // '' = blank start page (no webview yet)
+  url: string;
+  title: string;
+  favicon: string;
+}
+let tabSeq = 0;
+const nextTabId = () => `tab-${++tabSeq}`;
+
 interface TroveState {
   query: string;
   typeFilter: TypeFilter;
+  /** Discover result ordering (server-side via the GitHub Search API). */
+  discoverSort: DiscoverSort;
+  /** Library list ordering (client-side). */
+  librarySort: LibrarySort;
   installed: Project[];
   consoleOpen: boolean;
   /** Dock height in px (vertically resizable), persisted. */
@@ -93,8 +143,16 @@ interface TroveState {
   following: string[];
   /** Liked activity-post ids, session-only. */
   liked: string[];
-  /** Currently-playing YouTube video/playlist in the side mini-player, or null. */
+  /** Currently-playing YouTube video/playlist in the right media dock, or null. */
   video: YouTubeRef | null;
+  /** The "Up next" queue — every YouTube link from the README in view. */
+  videoQueue: YouTubeRef[];
+  /** Open browser tabs (the Trove app itself is the implicit pinned tab). */
+  tabs: BrowserTab[];
+  /** Active web tab id, or null when the Trove app tab is showing. */
+  activeTabId: string | null;
+  /** Width of the right media dock (video / browser) in px, persisted. */
+  dockWidth: number;
   /** Auto-update status (driven by the main process). */
   update: UpdateState;
   /** Whether to auto-install once the requested update finishes downloading. */
@@ -121,6 +179,8 @@ interface TroveState {
 
   setQuery: (q: string) => void;
   setType: (t: TypeFilter) => void;
+  setDiscoverSort: (s: DiscoverSort) => void;
+  setLibrarySort: (s: LibrarySort) => void;
   setConsoleOpen: (open: boolean) => void;
   toggleConsole: () => void;
   setConsoleHeight: (h: number) => void;
@@ -130,8 +190,21 @@ interface TroveState {
   toggleFollow: (handle: string) => void;
   isLiked: (id: string) => boolean;
   toggleLike: (id: string) => void;
-  playVideo: (ref: YouTubeRef) => void;
+  /** Play a video; optionally seed the "Up next" queue (defaults to just it). */
+  playVideo: (ref: YouTubeRef, queue?: YouTubeRef[]) => void;
+  /** Close the video dock. */
   closeVideo: () => void;
+  setDockWidth: (w: number) => void;
+
+  /** Open a web tab (and activate it). No url → a blank start page. */
+  openTab: (url?: string) => void;
+  /** Show a web tab, or the Trove app tab when id is null. */
+  activateTab: (id: string | null) => void;
+  closeTab: (id: string) => void;
+  /** Load a url into a tab (used by the start page + address bar "go"). */
+  navigateTab: (id: string, url: string) => void;
+  /** Update a tab's live metadata from webview events. */
+  setTabMeta: (id: string, meta: Partial<Omit<BrowserTab, 'id'>>) => void;
 
   setUpdate: (u: UpdateState) => void;
   /** Begin downloading the available update; install + restart when ready. */
@@ -149,6 +222,8 @@ interface TroveState {
 export const useTroveStore = create<TroveState>((set, get) => ({
   query: '',
   typeFilter: 'All',
+  discoverSort: loadEnum<DiscoverSort>(LS_DSORT, DISCOVER_SORTS, 'stars'),
+  librarySort: loadEnum<LibrarySort>(LS_LSORT, LIBRARY_SORTS, 'recent'),
   installed: loadInstalled(),
   consoleOpen: false,
   consoleHeight: loadHeight(),
@@ -156,6 +231,10 @@ export const useTroveStore = create<TroveState>((set, get) => ({
   following: loadFollowing(),
   liked: [],
   video: null,
+  videoQueue: [],
+  tabs: [],
+  activeTabId: null,
+  dockWidth: loadDockWidth(),
   update: { status: 'idle' },
   installOnReady: false,
   settings: loadSettings(),
@@ -254,6 +333,14 @@ export const useTroveStore = create<TroveState>((set, get) => ({
 
   setQuery: (q) => set({ query: q }),
   setType: (t) => set({ typeFilter: t }),
+  setDiscoverSort: (s) => {
+    persist(LS_DSORT, s);
+    set({ discoverSort: s });
+  },
+  setLibrarySort: (s) => {
+    persist(LS_LSORT, s);
+    set({ librarySort: s });
+  },
   setConsoleOpen: (open) => set({ consoleOpen: open }),
   toggleConsole: () => set((s) => ({ consoleOpen: !s.consoleOpen })),
   setConsoleHeight: (h) => {
@@ -281,8 +368,49 @@ export const useTroveStore = create<TroveState>((set, get) => ({
     set((s) => ({
       liked: s.liked.includes(id) ? s.liked.filter((x) => x !== id) : [...s.liked, id],
     })),
-  playVideo: (ref) => set({ video: ref }),
-  closeVideo: () => set({ video: null }),
+  playVideo: (ref, queue) => set({ video: ref, videoQueue: queue?.length ? queue : [ref] }),
+  closeVideo: () => set({ video: null, videoQueue: [] }),
+  setDockWidth: (w) => {
+    const next = clampDockW(w);
+    try {
+      localStorage.setItem(LS_DOCK_W, String(next));
+    } catch {
+      /* ignore */
+    }
+    set({ dockWidth: next });
+  },
+
+  openTab: (url) =>
+    set((s) => {
+      const id = nextTabId();
+      const tab: BrowserTab = {
+        id,
+        src: url || '',
+        url: url || '',
+        title: url ? 'Loading…' : 'New Tab',
+        favicon: '',
+      };
+      return { tabs: [...s.tabs, tab], activeTabId: id };
+    }),
+  activateTab: (id) => set({ activeTabId: id }),
+  closeTab: (id) =>
+    set((s) => {
+      const idx = s.tabs.findIndex((t) => t.id === id);
+      const tabs = s.tabs.filter((t) => t.id !== id);
+      let activeTabId = s.activeTabId;
+      if (s.activeTabId === id) {
+        // Fall back to the neighbour tab, else the Trove app tab.
+        const next = tabs[idx] || tabs[idx - 1] || null;
+        activeTabId = next ? next.id : null;
+      }
+      return { tabs, activeTabId };
+    }),
+  navigateTab: (id, url) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.id === id ? { ...t, src: t.src || url, url } : t)),
+    })),
+  setTabMeta: (id, meta) =>
+    set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, ...meta } : t)) })),
 
   isInstalled: (id) => get().installed.some((p) => p.id === id),
 

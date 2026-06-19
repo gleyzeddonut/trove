@@ -444,6 +444,45 @@ a {
   background: rgba(142, 125, 241, 0.35);
 }
 
+/* Right media dock (video / in-app browser). */
+.hv-handle {
+  transition: background 0.15s;
+}
+.hv-handle:hover,
+.hv-handle.drag {
+  background: var(--tv-accent);
+}
+.hv-gbtn {
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.hv-gbtn:not(:disabled):hover {
+  background: var(--tv-panelHover);
+  border-color: var(--tv-line2);
+  color: var(--tv-ink);
+}
+.hv-pl {
+  transition: background 0.12s;
+  cursor: pointer;
+}
+.hv-pl:hover {
+  background: var(--tv-panelHover);
+}
+.hv-pl:hover .hv-plthumb-ov {
+  opacity: 1 !important;
+}
+.hv-scroll::-webkit-scrollbar {
+  width: 9px;
+}
+.hv-scroll::-webkit-scrollbar-thumb {
+  background: var(--tv-line);
+  border-radius: 9px;
+  border: 2px solid var(--tv-bg);
+}
+.tv-menuitem:hover {
+  background: var(--tv-panelHover) !important;
+  color: var(--tv-ink) !important;
+}
+
 /* Focus rings for accessibility (the prototype had none). */
 :focus-visible {
   outline: 2px solid var(--tv-accent);

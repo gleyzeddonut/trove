@@ -73,5 +73,29 @@ const updater = {
 
 contextBridge.exposeInMainWorld('troveUpdater', updater);
 
+// Fetch YouTube oEmbed metadata in the main process — the public endpoint sends
+// no CORS header, so a renderer fetch would be blocked.
+const youtube = {
+  meta(watchUrl: string): Promise<{ title: string; author: string } | null> {
+    return ipcRenderer.invoke('youtube:meta', watchUrl);
+  },
+};
+
+contextBridge.exposeInMainWorld('troveYouTube', youtube);
+
+// Browser bridge: the main process asks the renderer to open a new tab when a
+// web tab tries to spawn a window (target=_blank / window.open).
+const browser = {
+  onNewTab(cb: (url: string) => void) {
+    const listener = (_e: IpcRendererEvent, url: string) => cb(url);
+    ipcRenderer.on('browser:new-tab', listener);
+    return () => ipcRenderer.removeListener('browser:new-tab', listener);
+  },
+};
+
+contextBridge.exposeInMainWorld('troveBrowser', browser);
+
 export type TroveTerminalApi = typeof api;
 export type TroveUpdaterApi = typeof updater;
+export type TroveYouTubeApi = typeof youtube;
+export type TroveBrowserApi = typeof browser;

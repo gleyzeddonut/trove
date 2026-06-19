@@ -128,19 +128,40 @@ function coverFor(seed: string): { cover: string; accent: string } {
   return { cover: `linear-gradient(135deg,${a},${b} 60%,${c})`, accent: a };
 }
 
+// GitHub has no "category" field, so we infer one from a repo's topics (best
+// signal) and fall back to its language. This is necessarily fuzzy — it's a
+// best guess, not ground truth.
+const TYPE_KEYWORDS: Record<ProjectType, string[]> = {
+  // matched as substrings of each topic, so "web-framework" hits "framework".
+  Creative: ['art', 'generative', 'creative', 'design', 'graphic', 'animation', 'game', 'gamedev', 'shader', 'music', 'audio', 'sound', 'render', '3d', 'webgl', 'drawing', 'paint', 'photo', 'video', 'font', 'emoji'],
+  App: ['app', 'application', 'desktop', 'electron', 'tauri', 'gui', 'pwa', 'mobile', 'android', 'ios', 'web-app', 'webapp', 'self-host', 'selfhost', 'dashboard', 'editor', 'browser', 'website', 'blog', 'cms', 'chat', 'client', 'platform', 'player', 'wiki', 'forum', 'ecommerce'],
+  Library: ['library', 'lib', 'framework', 'sdk', 'api', 'orm', 'parser', 'component', 'toolkit', 'package', 'module', 'wrapper', 'binding', 'plugin', 'middleware', 'runtime', 'engine', 'driver', 'protocol', 'spec', 'standard'],
+  Tool: ['cli', 'command-line', 'commandline', 'terminal', 'devtool', 'tool', 'tooling', 'productivity', 'automation', 'generator', 'linter', 'formatter', 'bundler', 'compiler', 'build', 'deploy', 'devops', 'monitor', 'utility', 'utils', 'script', 'proxy', 'manager', 'config', 'workflow'],
+};
+// Check order: most-specific buckets first so a "game engine" reads Creative,
+// not Library.
+const TYPE_ORDER: ProjectType[] = ['Creative', 'App', 'Library', 'Tool'];
+
+// Languages used predominantly to ship runnable apps vs. libraries — used only
+// when topics give us nothing.
+const APP_LANGS = ['Swift', 'Kotlin', 'Java', 'C#', 'Dart', 'Objective-C', 'HTML', 'CSS', 'Vue', 'Svelte'];
+const LIB_LANGS = ['TypeScript', 'JavaScript', 'Python', 'Ruby', 'PHP'];
+
 function deriveType(topics: string[], lang?: string | null): ProjectType {
-  const t = new Set(topics.map((x) => x.toLowerCase()));
-  const has = (...keys: string[]) => keys.some((x) => t.has(x));
-  if (has('art', 'generative', 'creative', 'design', 'graphics', 'animation', 'game', 'gamedev', 'shader', 'music', 'audio', 'render'))
-    return 'Creative';
-  if (has('cli', 'command-line', 'commandline', 'terminal', 'devtools', 'tool', 'tooling', 'productivity'))
-    return 'Tool';
-  if (has('library', 'sdk', 'framework', 'api', 'package', 'orm', 'parser', 'utils'))
-    return 'Library';
-  if (has('app', 'application', 'desktop', 'gui', 'pwa', 'mobile', 'web-app', 'webapp', 'self-hosted', 'selfhosted'))
-    return 'App';
-  // fall back by language flavor
-  if (lang && ['HTML', 'CSS', 'Vue', 'Svelte'].includes(lang)) return 'App';
+  const lc = topics.map((x) => x.toLowerCase());
+  // Short keywords (art, api, cli…) match a topic exactly — substring matching
+  // them would mislabel "smart", "rapid", "client", etc. Longer keywords match
+  // as substrings so "web-framework" still hits "framework".
+  const hit = (keys: string[]) =>
+    lc.some((topic) => keys.some((k) => (k.length <= 3 ? topic === k : topic.includes(k))));
+  for (const type of TYPE_ORDER) {
+    if (hit(TYPE_KEYWORDS[type])) return type;
+  }
+  // No usable topics → guess from language instead of dumping everything in Tool.
+  if (lang) {
+    if (APP_LANGS.includes(lang)) return 'App';
+    if (LIB_LANGS.includes(lang)) return 'Library';
+  }
   return 'Tool';
 }
 
@@ -417,11 +438,17 @@ export interface SearchPage {
 export const SEARCH_PER_PAGE = 100;
 export const SEARCH_MAX_PAGE = 10;
 
+/** How Discover results are ordered. 'best' = GitHub relevance (no sort param). */
+export type DiscoverSort = 'stars' | 'forks' | 'updated' | 'best';
+
 /** Search repositories. Empty query → popular repos by stars. */
-export async function searchRepos(query: string, page = 1): Promise<SearchPage> {
+export async function searchRepos(query: string, page = 1, sort: DiscoverSort = 'stars'): Promise<SearchPage> {
   const q = query.trim() || 'stars:>20000';
+  // GitHub's Search API takes sort=stars|forks|updated (+order); omitting it
+  // sorts by best match (relevance).
+  const sortParam = sort === 'best' ? '' : `&sort=${sort}&order=desc`;
   const data = await ghJson<{ items: GhRepo[]; total_count: number }>(
-    `/search/repositories?q=${encodeURIComponent(q)}&sort=stars&order=desc&per_page=${SEARCH_PER_PAGE}&page=${page}`,
+    `/search/repositories?q=${encodeURIComponent(q)}${sortParam}&per_page=${SEARCH_PER_PAGE}&page=${page}`,
   );
   return {
     items: (data.items || []).map(mapRepo),

@@ -61,3 +61,11 @@ export const mono = "'JetBrains Mono', ui-monospace, 'SF Mono', monospace";
 export const CONSOLE_OPEN_H = 332;
 export const CONSOLE_COLLAPSED_H = 38;
 export const CONSOLE_MIN_H = 150;
+
+/** Right-docked video player: width bounds (px). */
+export const DOCK_W_DEFAULT = 440;
+export const DOCK_W_MIN = 360;
+export const DOCK_W_MAX = 720;
+
+/** Height of the browser-chrome tab strip pinned at the top of the window. */
+export const TABBAR_H = 46;

@@ -17,6 +17,8 @@ export function Console() {
   const height = useTroveStore((s) => s.consoleHeight);
   const setHeight = useTroveStore((s) => s.setConsoleHeight);
   const poppedOut = useTroveStore((s) => s.poppedOut);
+  const dockOpen = useTroveStore((s) => !!s.video);
+  const dockWidth = useTroveStore((s) => s.dockWidth);
 
   const termRef = useRef<TerminalHandle>(null);
   const hasShell = typeof window !== 'undefined' && !!window.troveTerminal;
@@ -46,10 +48,10 @@ export function Console() {
   return (
     <div
       style={{
-        position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 50,
+        position: 'fixed', left: 0, right: dockOpen ? dockWidth : 0, bottom: 0, zIndex: 50,
         height, backgroundColor: T.bg, borderTop: `1px solid ${T.line}`,
         transform: open ? 'translateY(0)' : `translateY(${height - HEADER_H}px)`,
-        transition: 'transform .28s cubic-bezier(.4,0,.1,1)',
+        transition: 'transform .28s cubic-bezier(.4,0,.1,1), right .2s cubic-bezier(.4,0,.1,1)',
         boxShadow: open ? '0 -18px 50px rgba(0,0,0,.32)' : '0 -2px 12px rgba(0,0,0,.12)',
         display: 'flex', flexDirection: 'column', fontFamily: mono,
       }}

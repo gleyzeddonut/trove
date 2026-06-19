@@ -2,7 +2,7 @@
 // real GitHub public events. Two columns: followed + suggested creators on the
 // left, activity cards on the right.
 
-import { C, sans } from '../tokens';
+import { C, sans, TABBAR_H } from '../tokens';
 import { Nav } from '../components/Nav';
 import { ActivityCard, CreatorListRow } from '../components/social';
 import { useFeed } from '../lib/useGithub';
@@ -23,11 +23,9 @@ function Panel({ title, count, children }: { title: string; count?: number; chil
 
 export function Feed() {
   const following = useTroveStore((s) => s.following);
-  const consoleOpen = useTroveStore((s) => s.consoleOpen);
-  const toggleConsole = useTroveStore((s) => s.toggleConsole);
   const installedCount = useTroveStore((s) => s.installed.length);
   const feedScope = useTroveStore((s) => s.settings.feedScope);
-  const { onHome, onNav } = useNavActions();
+  const { onNav } = useNavActions();
 
   const { data, loading, error } = useFeed(following, feedScope);
 
@@ -39,7 +37,7 @@ export function Feed() {
 
   return (
     <div style={{ minHeight: '100%', background: C.bg, fontFamily: sans, color: C.ink }}>
-      <Nav active="Feed" consoleOpen={consoleOpen} libraryCount={installedCount} onToggleConsole={toggleConsole} onHome={onHome} onNav={onNav} />
+      <Nav active="Feed" libraryCount={installedCount} onNav={onNav} />
 
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '30px 28px 48px' }}>
         <h1 style={{ margin: 0, fontSize: 34, fontWeight: 800, letterSpacing: -1.2, lineHeight: 1.05, color: C.ink }}>Feed</h1>
@@ -51,7 +49,7 @@ export function Feed() {
 
         <div style={{ display: 'flex', gap: 32, marginTop: 24, alignItems: 'flex-start' }}>
           {/* LEFT: creators */}
-          <aside style={{ width: 252, flexShrink: 0, position: 'sticky', top: 80 }}>
+          <aside style={{ width: 252, flexShrink: 0, position: 'sticky', top: 80 + TABBAR_H }}>
             <Panel title="Following" count={followingCount}>
               {followed.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>

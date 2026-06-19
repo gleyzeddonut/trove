@@ -3,7 +3,7 @@
 
 import { useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { CONSOLE_COLLAPSED_H } from './tokens';
+import { CONSOLE_COLLAPSED_H, TABBAR_H } from './tokens';
 import { Storefront } from './pages/Storefront';
 import { Detail } from './pages/Detail';
 import { Feed } from './pages/Feed';
@@ -11,7 +11,9 @@ import { Creator } from './pages/Creator';
 import { Settings } from './pages/Settings';
 import { TerminalWindow } from './pages/TerminalWindow';
 import { Console } from './components/console/Console';
-import { MiniPlayer } from './components/MiniPlayer';
+import { MediaDock } from './components/MediaDock';
+import { BrowserChrome } from './components/browser/BrowserChrome';
+import { WebTabView } from './components/browser/WebTabView';
 import { useTroveStore } from './store/useTroveStore';
 import { applyTheme } from './lib/settings';
 
@@ -22,6 +24,10 @@ export default function App() {
   const toggleConsole = useTroveStore((s) => s.toggleConsole);
   const settings = useTroveStore((s) => s.settings);
   const themeTick = useTroveStore((s) => s.themeTick);
+  const dockOpen = useTroveStore((s) => !!s.video);
+  const dockWidth = useTroveStore((s) => s.dockWidth);
+  const tabs = useTroveStore((s) => s.tabs);
+  const activeTabId = useTroveStore((s) => s.activeTabId);
   const { pathname } = useLocation();
   const navigate = useNavigate();
 
@@ -60,6 +66,13 @@ export default function App() {
     const t = window.troveTerminal;
     if (!t) return;
     return t.onPopState((v) => useTroveStore.getState().setPoppedOut(v));
+  }, []);
+
+  // Links inside a web tab that try to open a new window become new tabs.
+  useEffect(() => {
+    const b = window.troveBrowser;
+    if (!b) return;
+    return b.onNewTab((url) => useTroveStore.getState().openTab(url));
   }, []);
 
   // Auto-update: mirror main-process status into the store, and once a
@@ -104,33 +117,48 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [setConsoleOpen, toggleConsole, navigate]);
 
-  // The popped-out window renders only the terminal — no nav, dock, or padding.
+  // The popped-out window renders only the terminal — no chrome, nav, or dock.
   if (pathname === '/__terminal') return <TerminalWindow />;
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: 'var(--tv-bg)',
-        paddingBottom: consoleOpen ? consoleHeight : CONSOLE_COLLAPSED_H,
-        transition: 'padding-bottom .28s cubic-bezier(.4,0,.1,1)',
-      }}
-    >
-      {/* Remount the routed tree on theme/accent change so inline var()-based
-          styles re-resolve (see handoff §12). Density is CSS-only (no remount). */}
-      <div className="tv-main" key={`${settings.theme}:${settings.accent}:${themeTick}`}>
-        <Routes>
-          <Route path="/" element={<Storefront mode="discover" />} />
-          <Route path="/library" element={<Storefront mode="library" />} />
-          <Route path="/feed" element={<Feed />} />
-          <Route path="/c/:handle" element={<Creator />} />
-          <Route path="/p/:owner/:repo" element={<Detail />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+    <>
+      <BrowserChrome />
+
+      {/* The Trove app — the pinned tab. Stays mounted under the web tabs so
+          its scroll/console/route survive tab switches; the web-tab overlays
+          (z-index 80) cover it when one is active. */}
+      <div
+        style={{
+          minHeight: '100vh',
+          background: 'var(--tv-bg)',
+          paddingTop: TABBAR_H,
+          paddingBottom: consoleOpen ? consoleHeight : CONSOLE_COLLAPSED_H,
+          // Make room for the right video dock so content isn't hidden behind it.
+          paddingRight: dockOpen ? dockWidth : 0,
+          transition: 'padding-bottom .28s cubic-bezier(.4,0,.1,1), padding-right .2s cubic-bezier(.4,0,.1,1)',
+        }}
+      >
+        {/* Remount the routed tree on theme/accent change so inline var()-based
+            styles re-resolve (see handoff §12). Density is CSS-only (no remount). */}
+        <div className="tv-main" key={`${settings.theme}:${settings.accent}:${themeTick}`}>
+          <Routes>
+            <Route path="/" element={<Storefront mode="discover" />} />
+            <Route path="/library" element={<Storefront mode="library" />} />
+            <Route path="/feed" element={<Feed />} />
+            <Route path="/c/:handle" element={<Creator />} />
+            <Route path="/p/:owner/:repo" element={<Detail />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
+        <Console />
+        <MediaDock />
       </div>
-      <Console />
-      <MiniPlayer />
-    </div>
+
+      {/* Web tabs: mounted while open (preserving their pages), shown when active. */}
+      {tabs.map((t) => (
+        <WebTabView key={t.id} tab={t} active={t.id === activeTabId} />
+      ))}
+    </>
   );
 }
