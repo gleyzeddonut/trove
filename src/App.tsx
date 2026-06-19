@@ -29,8 +29,16 @@ export default function App() {
   useEffect(() => {
     applyTheme(useTroveStore.getState().settings);
     useTroveStore.getState().hydrateAccount();
+
+    // Sync theme across windows (e.g. the popped-out terminal) — the other
+    // window changing settings fires a `storage` event here.
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'trove.settings.v1') useTroveStore.getState().reloadSettings();
+    };
+    window.addEventListener('storage', onStorage);
+
+    // Re-apply theme on OS scheme changes while in "system" mode.
     const mq = window.matchMedia?.('(prefers-color-scheme: light)');
-    if (!mq) return;
     const onChange = () => {
       const st = useTroveStore.getState();
       if (st.settings.theme === 'system') {
@@ -38,16 +46,11 @@ export default function App() {
         st.bumpTheme();
       }
     };
-    mq.addEventListener('change', onChange);
-    // Sync theme across windows (e.g. the popped-out terminal) — the other
-    // window changing settings fires a `storage` event here.
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === 'trove.settings.v1') useTroveStore.getState().reloadSettings();
-    };
-    window.addEventListener('storage', onStorage);
+    mq?.addEventListener('change', onChange);
+
     return () => {
-      mq.removeEventListener('change', onChange);
       window.removeEventListener('storage', onStorage);
+      mq?.removeEventListener('change', onChange);
     };
   }, []);
 

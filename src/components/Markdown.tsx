@@ -11,12 +11,15 @@ import { C, mono } from '../tokens';
 import { openExternal } from '../lib/external';
 
 function makeUrlTransform(owner: string, repo: string, branch: string) {
-  return (url: string): string => {
+  return (url: string, key: string): string => {
     if (!url) return url;
     if (/^(https?:|mailto:|data:)/i.test(url) || url.startsWith('#')) return url;
-    const path = url.replace(/^\.?\//, '');
-    // Images load from raw; other links go to the rendered file on github.com.
-    return `https://github.com/${owner}/${repo}/blob/${branch}/${path}`;
+    const path = url.replace(/^\.?\//, '').replace(/^\//, '');
+    // Image sources must hit the raw host (blob URLs return an HTML page);
+    // links go to the rendered file on github.com.
+    return key === 'src'
+      ? `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`
+      : `https://github.com/${owner}/${repo}/blob/${branch}/${path}`;
   };
 }
 
@@ -62,7 +65,11 @@ export function Markdown({ md, owner, repo, branch }: { md: string; owner: strin
       return (
         <a
           href={href}
-          onClick={(e) => { e.preventDefault(); if (href) openExternal(href); }}
+          onClick={(e) => {
+            e.preventDefault();
+            // Ignore in-page anchors; open real links in the OS browser.
+            if (href && !href.startsWith('#')) openExternal(href);
+          }}
         >
           {children}
         </a>
