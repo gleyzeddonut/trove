@@ -94,6 +94,8 @@ export default function App() {
       return !!a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA');
     };
     const onKey = (e: KeyboardEvent) => {
+      // A web tab is its own context — don't let these drive the hidden app.
+      if (useTroveStore.getState().activeTabId !== null) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
         e.preventDefault();
         toggleConsole();

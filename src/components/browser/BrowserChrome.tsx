@@ -25,7 +25,10 @@ function AppZone({ active, onClick }: { active: boolean; onClick: () => void }) 
         alignSelf: 'stretch', display: 'flex', alignItems: 'center', gap: 9,
         paddingLeft: LIGHTS_W, paddingRight: 16, cursor: 'pointer',
         borderRadius: '0 12px 12px 0',
-        background: active ? 'var(--tv-accentSoft)' : 'transparent',
+        // backgroundColor longhand (not the `background` shorthand) so it
+        // re-resolves on a live theme swap; accentSoft is a fixed tint, not a
+        // CSS var (there is no --tv-accentSoft).
+        backgroundColor: active ? C.accentSoft : 'transparent',
         boxShadow: active ? `inset 0 -2.5px 0 ${C.accent}` : 'none',
         borderRight: `1px solid ${C.line2}`,
       }}
@@ -59,7 +62,7 @@ function WebTab({
         ...noDrag,
         position: 'relative', height: 34, alignSelf: 'flex-end', display: 'flex', alignItems: 'center', gap: 8,
         padding: '0 10px 0 12px', minWidth: 130, maxWidth: 220, cursor: 'pointer',
-        background: active ? 'var(--tv-bg)' : 'transparent',
+        backgroundColor: active ? 'var(--tv-bg)' : 'transparent',
         border: active ? `1px solid ${C.line}` : '1px solid transparent',
         borderBottom: 'none', borderRadius: '10px 10px 0 0',
       }}
@@ -102,7 +105,7 @@ export function BrowserChrome() {
         ...drag,
         position: 'fixed', top: 0, left: 0, right: 0, height: TABBAR_H, zIndex: 90,
         display: 'flex', alignItems: 'flex-end', gap: 2,
-        background: 'var(--tv-navbg)', backdropFilter: 'blur(10px)',
+        backgroundColor: 'var(--tv-navbg)', backdropFilter: 'blur(10px)',
         borderBottom: `1px solid ${C.line2}`, paddingRight: 10,
       }}
     >

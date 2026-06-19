@@ -55,7 +55,7 @@ function ToolbarBtn({
 function StartPage({ onGo }: { onGo: (url: string) => void }) {
   const [v, setV] = useState('');
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 22, background: 'var(--tv-bg)' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 22, backgroundColor: 'var(--tv-bg)' }}>
       <div style={{ fontFamily: sans, fontSize: 22, fontWeight: 800, letterSpacing: -0.6, color: C.ink }}>
         Open a page
       </div>
@@ -72,11 +72,11 @@ function StartPage({ onGo }: { onGo: (url: string) => void }) {
           value={v}
           onChange={(e) => setV(e.target.value)}
           placeholder="Enter a URL or search…"
-          style={{ flex: 1, fontFamily: sans, fontSize: 14, color: C.ink, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 11, padding: '11px 15px', outline: 'none' }}
+          style={{ flex: 1, fontFamily: sans, fontSize: 14, color: C.ink, backgroundColor: C.panel, border: `1px solid ${C.line}`, borderRadius: 11, padding: '11px 15px', outline: 'none' }}
         />
         <button
           type="submit"
-          style={{ fontFamily: sans, fontWeight: 700, fontSize: 13.5, color: '#fff', background: C.accent, border: 'none', borderRadius: 11, padding: '0 18px', cursor: 'pointer' }}
+          style={{ fontFamily: sans, fontWeight: 700, fontSize: 13.5, color: '#fff', backgroundColor: C.accent, border: 'none', borderRadius: 11, padding: '0 18px', cursor: 'pointer' }}
         >
           Go
         </button>
@@ -144,7 +144,7 @@ export function WebTabView({ tab, active }: { tab: BrowserTab; active: boolean }
     <div
       style={{
         position: 'fixed', top: TABBAR_H, left: 0, right: 0, bottom: 0, zIndex: 80,
-        display: active ? 'flex' : 'none', flexDirection: 'column', background: 'var(--tv-bg)',
+        display: active ? 'flex' : 'none', flexDirection: 'column', backgroundColor: 'var(--tv-bg)',
       }}
     >
       {/* address toolbar */}
@@ -171,7 +171,7 @@ export function WebTabView({ tab, active }: { tab: BrowserTab; active: boolean }
             onBlur={() => setEditing(false)}
             placeholder="Search or enter address"
             spellCheck={false}
-            style={{ flex: 1, fontFamily: mono, fontSize: 12.5, color: C.ink, background: C.sunk, border: `1px solid ${C.line}`, borderRadius: 9, padding: '7px 13px', outline: 'none' }}
+            style={{ flex: 1, fontFamily: mono, fontSize: 12.5, color: C.ink, backgroundColor: C.sunk, border: `1px solid ${C.line}`, borderRadius: 9, padding: '7px 13px', outline: 'none' }}
           />
         </form>
       </div>
