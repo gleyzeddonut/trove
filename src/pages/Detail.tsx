@@ -227,11 +227,12 @@ export function Detail() {
                       key={c.login}
                       src={c.avatarUrl}
                       alt={c.login}
-                      title={c.login}
+                      title={`@${c.login}`}
                       width={30}
                       height={30}
                       loading="lazy"
-                      style={{ width: 30, height: 30, borderRadius: 8, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.1)', objectFit: 'cover' }}
+                      onClick={() => onOpenCreator(c.login)}
+                      style={{ width: 30, height: 30, borderRadius: 8, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.1)', objectFit: 'cover', cursor: 'pointer' }}
                     />
                   ))}
                 </div>

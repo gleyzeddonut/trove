@@ -5,10 +5,11 @@
 // copy button; external links open in the OS browser.
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { C, mono } from '../tokens';
-import { openExternal } from '../lib/external';
+import { githubRoute, openExternal } from '../lib/external';
 
 function makeUrlTransform(owner: string, repo: string, branch: string) {
   return (url: string, key: string): string => {
@@ -60,6 +61,7 @@ function CodeBlock({ code }: { code: string }) {
 }
 
 export function Markdown({ md, owner, repo, branch }: { md: string; owner: string; repo: string; branch: string }) {
+  const navigate = useNavigate();
   const components: Components = {
     a({ href, children }) {
       return (
@@ -67,8 +69,12 @@ export function Markdown({ md, owner, repo, branch }: { md: string; owner: strin
           href={href}
           onClick={(e) => {
             e.preventDefault();
-            // Ignore in-page anchors; open real links in the OS browser.
-            if (href && !href.startsWith('#')) openExternal(href);
+            if (!href || href.startsWith('#')) return; // ignore in-page anchors
+            // GitHub repo/user links stay in the app as native Trove pages;
+            // everything else opens in the OS browser.
+            const route = githubRoute(href);
+            if (route) navigate(route);
+            else openExternal(href);
           }}
         >
           {children}
