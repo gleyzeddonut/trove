@@ -10,6 +10,8 @@ import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { C, mono } from '../tokens';
 import { githubRoute, openExternal } from '../lib/external';
+import { youtubeRef } from '../lib/youtube';
+import { useTroveStore } from '../store/useTroveStore';
 
 function makeUrlTransform(owner: string, repo: string, branch: string) {
   return (url: string, key: string): string => {
@@ -62,6 +64,7 @@ function CodeBlock({ code }: { code: string }) {
 
 export function Markdown({ md, owner, repo, branch }: { md: string; owner: string; repo: string; branch: string }) {
   const navigate = useNavigate();
+  const playVideo = useTroveStore((s) => s.playVideo);
   const components: Components = {
     a({ href, children }) {
       return (
@@ -70,11 +73,13 @@ export function Markdown({ md, owner, repo, branch }: { md: string; owner: strin
           onClick={(e) => {
             e.preventDefault();
             if (!href || href.startsWith('#')) return; // ignore in-page anchors
-            // GitHub repo/user links stay in the app as native Trove pages;
-            // everything else opens in the OS browser.
+            // GitHub repo/user links → native Trove pages; YouTube → side
+            // mini-player; everything else → the OS browser.
             const route = githubRoute(href);
-            if (route) navigate(route);
-            else openExternal(href);
+            if (route) return navigate(route);
+            const yt = youtubeRef(href);
+            if (yt) return playVideo(yt.id, yt.start);
+            openExternal(href);
           }}
         >
           {children}

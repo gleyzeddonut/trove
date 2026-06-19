@@ -11,6 +11,7 @@ import { Creator } from './pages/Creator';
 import { Settings } from './pages/Settings';
 import { TerminalWindow } from './pages/TerminalWindow';
 import { Console } from './components/console/Console';
+import { MiniPlayer } from './components/MiniPlayer';
 import { useTroveStore } from './store/useTroveStore';
 import { applyTheme } from './lib/settings';
 
@@ -129,6 +130,7 @@ export default function App() {
         </Routes>
       </div>
       <Console />
+      <MiniPlayer />
     </div>
   );
 }

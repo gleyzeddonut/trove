@@ -92,6 +92,8 @@ interface TroveState {
   following: string[];
   /** Liked activity-post ids, session-only. */
   liked: string[];
+  /** Currently-playing YouTube video in the side mini-player, or null. */
+  video: { id: string; start?: number } | null;
   /** Auto-update status (driven by the main process). */
   update: UpdateState;
   /** Whether to auto-install once the requested update finishes downloading. */
@@ -127,6 +129,8 @@ interface TroveState {
   toggleFollow: (handle: string) => void;
   isLiked: (id: string) => boolean;
   toggleLike: (id: string) => void;
+  playVideo: (id: string, start?: number) => void;
+  closeVideo: () => void;
 
   setUpdate: (u: UpdateState) => void;
   /** Begin downloading the available update; install + restart when ready. */
@@ -150,6 +154,7 @@ export const useTroveStore = create<TroveState>((set, get) => ({
   poppedOut: false,
   following: loadFollowing(),
   liked: [],
+  video: null,
   update: { status: 'idle' },
   installOnReady: false,
   settings: loadSettings(),
@@ -275,6 +280,8 @@ export const useTroveStore = create<TroveState>((set, get) => ({
     set((s) => ({
       liked: s.liked.includes(id) ? s.liked.filter((x) => x !== id) : [...s.liked, id],
     })),
+  playVideo: (id, start) => set({ video: { id, start } }),
+  closeVideo: () => set({ video: null }),
 
   isInstalled: (id) => get().installed.some((p) => p.id === id),
 
