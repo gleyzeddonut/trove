@@ -9,9 +9,9 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "dist": "npm run build && { [ -f .env.release ] && set -a && . ./.env.release && set +a || true; } && PATH=\"/usr/bin:/bin:/usr/sbin:/sbin:$PATH\" electron-builder --mac",
-    "dist:dir": "npm run build && PATH=\"/usr/bin:/bin:/usr/sbin:/sbin:$PATH\" electron-builder --mac --dir",
-    "release": "npm run build && { [ -f .env.release ] && set -a && . ./.env.release && set +a || true; } && PATH=\"/usr/bin:/bin:/usr/sbin:/sbin:$PATH\" electron-builder --mac --publish always",
+    "dist": "npm run build && { [ -f .env.release ] && set -a && . ./.env.release && set +a || true; } && rm -rf release && PATH=\"/usr/bin:/bin:/usr/sbin:/sbin:$PATH\" electron-builder --mac",
+    "dist:dir": "npm run build && rm -rf release && PATH=\"/usr/bin:/bin:/usr/sbin:/sbin:$PATH\" electron-builder --mac --dir",
+    "release": "npm run build && { [ -f .env.release ] && set -a && . ./.env.release && set +a || true; } && rm -rf release && PATH=\"/usr/bin:/bin:/usr/sbin:/sbin:$PATH\" electron-builder --mac --publish always",
     "rebuild": "electron-rebuild -f -w node-pty",
     "typecheck": "tsc --noEmit",
     "postinstall": "node scripts/postinstall.mjs"
