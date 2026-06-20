@@ -55,11 +55,15 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
   const effectiveSort = !q && discoverSort === 'best' ? 'stars' : discoverSort;
   const { results: remote, total, loading, loadingMore, error, hasMore, loadMore } = useGithubSearch(query, !isLib && !!q, effectiveSort);
 
-  // Once the storefront has data behind it, dismiss the boot splash (it has its
-  // own minimum on-screen time + a max cap, so a single call is enough).
+  // Dismiss the boot splash once there's real content behind it. On Discover's
+  // landing that's the shelves (each Shelf signals when its cards load); for
+  // Library / a search, it's this flat list settling. (The splash dedupes and
+  // has its own min/max timing, so multiple calls are fine.)
   useEffect(() => {
-    if (!loading) window.__troveBootReady?.();
-  }, [loading]);
+    // On Discover's landing (no query) the shelves signal readiness themselves.
+    const onLanding = !isLib && !q;
+    if (!onLanding && !loading) window.__troveBootReady?.();
+  }, [isLib, q, loading]);
 
   const installedIds = new Set(installed.map((p) => p.id));
 

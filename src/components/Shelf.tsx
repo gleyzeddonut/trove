@@ -84,6 +84,13 @@ export function Shelf({
   // collapses without a gap and the observer stays valid).
   const hide = visible && resolved && items.length === 0;
 
+  // The first shelf to show real content dismisses the boot splash — so it
+  // holds until the storefront actually has cards behind it (the splash dedupes
+  // and has its own min/max timing).
+  useEffect(() => {
+    if (showCards) window.__troveBootReady?.();
+  }, [showCards]);
+
   return (
     <section ref={ref} style={{ display: hide ? 'none' : 'block', marginTop: 30 }}>
       {/* header */}
