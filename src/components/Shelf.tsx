@@ -9,10 +9,36 @@ import { useEffect, useRef, useState } from 'react';
 import { C, sans } from '../tokens';
 import { ShelfCard } from './ShelfCard';
 import { useGithubSearch } from '../lib/useGithub';
-import type { Shelf as ShelfDef } from '../data/shelves';
+import type { Shelf as ShelfDef, ShelfIconId } from '../data/shelves';
 import type { Project } from '../types';
 
 const PREVIEW = 12;
+
+// Stroke icons matching the app's icon language (Lucide-style), in place of
+// emojis so the headers stay on-theme. Rendered in the accent color.
+function ShelfIcon({ id }: { id: ShelfIconId }) {
+  const p = { width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.9, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  switch (id) {
+    case 'gem':
+      return <svg {...p}><path d="M6 3h12l4 6-10 13L2 9Z" /><path d="M11 3 8 9l4 13 4-13-3-6" /><path d="M2 9h20" /></svg>;
+    case 'ai':
+      return <svg {...p}><path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2" /><path d="M20 14h2" /><path d="M15 13v2" /><path d="M9 13v2" /></svg>;
+    case 'terminal':
+      return <svg {...p}><path d="m4 17 6-6-6-6" /><path d="M12 19h8" /></svg>;
+    case 'server':
+      return <svg {...p}><rect width="20" height="8" x="2" y="2" rx="2" /><rect width="20" height="8" x="2" y="14" rx="2" /><path d="M6 6h.01" /><path d="M6 18h.01" /></svg>;
+    case 'game':
+      return <svg {...p}><line x1="6" x2="10" y1="12" y2="12" /><line x1="8" x2="8" y1="10" y2="14" /><line x1="15" x2="15.01" y1="13" y2="13" /><line x1="18" x2="18.01" y1="11" y2="11" /><rect width="20" height="12" x="2" y="6" rx="2" /></svg>;
+    case 'shield':
+      return <svg {...p}><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>;
+    case 'creative':
+      return <svg {...p}><path d="M8.3 10a.7.7 0 0 1-.626-1.079L11.4 3a.7.7 0 0 1 1.198-.043L16.3 8.9a.7.7 0 0 1-.572 1.1Z" /><rect x="3" y="14" width="7" height="7" rx="1" /><circle cx="17.5" cy="17.5" r="3.5" /></svg>;
+    case 'swap':
+      return <svg {...p}><path d="m2 9 3-3 3 3" /><path d="M13 18H7a2 2 0 0 1-2-2V6" /><path d="m22 15-3 3-3-3" /><path d="M11 6h6a2 2 0 0 1 2 2v10" /></svg>;
+    default:
+      return null;
+  }
+}
 
 function CardSkeleton() {
   return (
@@ -95,8 +121,12 @@ export function Shelf({
     <section ref={ref} style={{ display: hide ? 'none' : 'block', marginTop: 30 }}>
       {/* header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 13 }}>
-        <span style={{ fontSize: 18, lineHeight: 1 }}>{shelf.icon}</span>
-        <h2 style={{ margin: 0, fontFamily: sans, fontSize: 17, fontWeight: 700, letterSpacing: -0.3, color: C.ink }}>{shelf.title}</h2>
+        <span className="hs-tip" data-tip={shelf.description} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, cursor: 'default' }}>
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 8, background: C.accentSoft, color: C.accent, flexShrink: 0 }}>
+            <ShelfIcon id={shelf.icon} />
+          </span>
+          <h2 style={{ margin: 0, fontFamily: sans, fontSize: 17, fontWeight: 700, letterSpacing: -0.3, color: C.ink }}>{shelf.title}</h2>
+        </span>
         <div style={{ flex: 1 }} />
         <button
           onClick={() => onSeeAll(shelf)}
