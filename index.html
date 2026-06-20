@@ -187,7 +187,7 @@
         <div class="ln"><span class="pr">❯</span> trove init</div>
         <div class="ln"><span class="ok">✓</span> mounting registry · 198,442,310 repos</div>
         <div class="ln"><span class="ok">✓</span> connecting terminal</div>
-        <div class="ln">starting storefront<span class="boot-cursor"></span></div>
+        <div class="ln" id="boot-last">starting storefront<span class="boot-cursor"></span></div>
       </div>
       <div class="boot-barwrap"><div class="boot-bar"></div></div>
     </div>
@@ -203,11 +203,17 @@
         var start = performance.now();
         var MIN = 2400; // floor so the animation + a cursor blink read
         var MAX = 9000; // ceiling so we never wait forever on the network
+        var DWELL = 600; // how long the completed ✓ shows before fading
         var fired = false;
         function finish() {
           if (fired) return;
           fired = true;
-          var wait = Math.max(0, MIN - (performance.now() - start));
+          // Complete the last line with a green check (like the others) so the
+          // boot sequence "finishes" before fading into the loaded store.
+          var last = document.getElementById('boot-last');
+          if (last) last.innerHTML = '<span class="ok">✓</span> storefront ready';
+          // Stay up at least MIN total, and at least DWELL after the check shows.
+          var wait = Math.max(DWELL, MIN - (performance.now() - start));
           setTimeout(function () {
             boot.classList.add('done');
             setTimeout(function () {
