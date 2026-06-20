@@ -114,6 +114,21 @@ a {
   background: var(--tv-panelHover);
   border-color: var(--tv-hair);
 }
+/* shelf card */
+.hs-card {
+  transition: background 0.15s, border-color 0.15s, transform 0.12s;
+}
+.hs-card:hover {
+  background: var(--tv-panelHover);
+  border-color: var(--tv-hair);
+  transform: translateY(-2px);
+}
+.hs-seeall {
+  transition: opacity 0.12s;
+}
+.hs-seeall:hover {
+  opacity: 0.65;
+}
 /* command chip — fixed dark in both themes */
 .hs-cmd {
   transition: background 0.15s, border-color 0.15s;
@@ -472,6 +487,7 @@ a {
 }
 .hv-scroll::-webkit-scrollbar {
   width: 9px;
+  height: 9px;
 }
 .hv-scroll::-webkit-scrollbar-thumb {
   background: var(--tv-line);

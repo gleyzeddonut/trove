@@ -7,9 +7,11 @@ import { C, mono, sans } from '../tokens';
 import { Nav, type NavItem } from '../components/Nav';
 import { TypeChip } from '../components/TypeChip';
 import { ProjectRow } from '../components/ProjectRow';
+import { Shelf } from '../components/Shelf';
 import { SortMenu } from '../components/SortMenu';
 import { Box, SearchIcon } from '../components/icons';
 import { TROVE_TYPES } from '../data/constants';
+import { SHELVES, type Shelf as ShelfDef } from '../data/shelves';
 import { troveMatch } from '../data/match';
 import { useGithubSearch } from '../lib/useGithub';
 import { useTroveStore } from '../store/useTroveStore';
@@ -44,12 +46,14 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
 
   const { onNav, onOpenDetail } = useNavActions();
 
-  // Discover hits GitHub (server-side search); Library is purely local.
+  // Discover hits GitHub (server-side search); Library is purely local. The
+  // flat-list search only runs for Discover *with a query* — the no-query
+  // landing shows curated shelves (each its own search) instead.
   const q = query.trim();
   // "Best match" (GitHub relevance) only means something with a query; with no
   // search it'd just be ranking the default popular set, so fall back to stars.
   const effectiveSort = !q && discoverSort === 'best' ? 'stars' : discoverSort;
-  const { results: remote, total, loading, loadingMore, error, hasMore, loadMore } = useGithubSearch(query, !isLib, effectiveSort);
+  const { results: remote, total, loading, loadingMore, error, hasMore, loadMore } = useGithubSearch(query, !isLib && !!q, effectiveSort);
 
   // Once the storefront has data behind it, dismiss the boot splash (it has its
   // own minimum on-screen time + a max cap, so a single call is enough).
@@ -59,18 +63,27 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
 
   const installedIds = new Set(installed.map((p) => p.id));
 
-  // Base set per surface. Discover already searched (and sorted) server-side, so
-  // we only apply the type filter client-side; Library filters locally by
-  // query+type, then sorts by the chosen key.
+  // Discover searched server-side (no client-side category filter anymore);
+  // Library filters locally by query+type, then sorts by the chosen key.
   const base: Project[] = isLib ? installed : remote;
-  const byType = (p: Project) => typeFilter === 'All' || p.type === typeFilter;
   const results = isLib
     ? sortLibrary(base.filter((p) => troveMatch(p, query, typeFilter)), librarySort)
-    : base.filter(byType);
+    : base;
 
   const typeCount = (t: TypeFilter) =>
     t === 'All' ? base.length : base.filter((p) => p.type === t).length;
   const installedCount = installed.length;
+
+  // Discover's no-search landing shows curated shelves instead of a list.
+  const showShelves = !isLib && !q;
+
+  // "See all" on a shelf runs its query in the flat list (shared cache key, so
+  // it paints instantly), then paginates the full category.
+  const onSeeAll = (shelf: ShelfDef) => {
+    setDiscoverSort(shelf.sort);
+    setQuery(shelf.query);
+    requestAnimationFrame(() => window.scrollTo(0, 0));
+  };
 
   // Type is reflected by the chips now, so Discover stays highlighted for any
   // type filter.
@@ -134,11 +147,21 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
               <span style={{ fontFamily: mono, fontSize: 12, color: C.faint, border: `1px solid ${C.line}`, borderRadius: 6, padding: '4px 7px' }}>⌘K</span>
             </div>
 
-            {/* TYPE CHIPS */}
+            {showShelves ? (
+              /* DISCOVER LANDING — curated shelves (each its own GitHub search) */
+              <div style={{ marginTop: 4 }}>
+                {SHELVES.map((s) => (
+                  <Shelf key={s.id} shelf={s} onSeeAll={onSeeAll} onOpenDetail={onOpenDetail} installedIds={installedIds} />
+                ))}
+              </div>
+            ) : (
+              <>
+            {/* CONTROLS — type chips (Library only) + sort */}
             <div style={{ display: 'flex', gap: 9, marginTop: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-              {TYPES.map((t) => (
-                <TypeChip key={t} label={t} active={typeFilter === t} count={typeCount(t)} onClick={() => setType(t)} />
-              ))}
+              {isLib &&
+                TYPES.map((t) => (
+                  <TypeChip key={t} label={t} active={typeFilter === t} count={typeCount(t)} onClick={() => setType(t)} />
+                ))}
               <div style={{ flex: 1 }} />
               {isLib ? (
                 <SortMenu
@@ -232,6 +255,8 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
                     </button>
                   </div>
                 )}
+              </>
+            )}
               </>
             )}
           </>
