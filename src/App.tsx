@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { CONSOLE_COLLAPSED_H, TABBAR_H } from './tokens';
 import { Storefront } from './pages/Storefront';
+import { Top } from './pages/Top';
 import { Detail } from './pages/Detail';
 import { Feed } from './pages/Feed';
 import { Creator } from './pages/Creator';
@@ -140,6 +141,7 @@ export default function App() {
           its scroll/console/route survive tab switches; the web-tab overlays
           (z-index 80) cover it when one is active. */}
       <div
+        className="tv-app"
         style={{
           minHeight: '100vh',
           background: 'var(--tv-bg)',
@@ -155,6 +157,7 @@ export default function App() {
         <div className="tv-main" key={`${settings.theme}:${settings.accent}:${themeTick}`}>
           <Routes>
             <Route path="/" element={<Storefront mode="discover" />} />
+            <Route path="/top" element={<Top />} />
             <Route path="/library" element={<Storefront mode="library" />} />
             <Route path="/feed" element={<Feed />} />
             <Route path="/c/:handle" element={<Creator />} />

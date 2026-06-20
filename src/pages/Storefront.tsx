@@ -78,6 +78,16 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
     t === 'All' ? base.length : base.filter((p) => p.type === t).length;
   const installedCount = installed.length;
 
+  // For the mono eyebrow: the live search total, else the registry size the app
+  // persisted last session (so there's a real number before any search runs).
+  const registrySize = (() => {
+    try {
+      return parseInt(localStorage.getItem('trove.registrySize') || '', 10) || 0;
+    } catch {
+      return 0;
+    }
+  })();
+
   // Discover's no-search landing shows curated shelves instead of a list.
   const showShelves = !isLib && !q;
 
@@ -101,6 +111,11 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
         {/* HERO */}
         {isLib ? (
           <>
+            <div style={{ fontFamily: mono, fontSize: 12.5, color: C.faint, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ color: C.accent }}>❯</span> trove library
+              <span>·</span>
+              <span style={{ color: C.green }}>✓</span> {installedCount} installed
+            </div>
             <h1 style={{ margin: 0, fontSize: 34, fontWeight: 800, letterSpacing: -1.2, lineHeight: 1.05, color: C.ink }}>Your Library</h1>
             <p style={{ margin: '9px 0 20px', fontSize: 15, color: C.sub, fontWeight: 500 }}>
               {installedCount > 0
@@ -110,11 +125,19 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
           </>
         ) : (
           <>
+            {/* mono eyebrow — echoes the boot splash's terminal lines */}
+            <div style={{ fontFamily: mono, fontSize: 12.5, color: C.faint, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ color: C.accent }}>❯</span> trove discover
+              <span>·</span>
+              <span style={{ color: C.green }}>✓</span> {(total || registrySize).toLocaleString()} repos indexed
+            </div>
             <h1 style={{ margin: 0, fontSize: 34, fontWeight: 800, letterSpacing: -1.2, lineHeight: 1.05, color: C.ink }}>Find what's worth installing.</h1>
             <p style={{ margin: '9px 0 20px', fontSize: 15, color: C.sub, fontWeight: 500 }}>
               Real repositories from GitHub. Browse it like a store, install it like a terminal.
               {installedCount > 0 && <span style={{ color: C.green, fontWeight: 700 }}> · {installedCount} installed</span>}
             </p>
+            {/* signature gradient hairline (Discover only) */}
+            <div style={{ height: 2, maxWidth: 340, borderRadius: 2, margin: '20px 0 22px', background: 'linear-gradient(90deg,#8e7df1,#06b6d4 60%,transparent)' }} />
           </>
         )}
 
@@ -133,7 +156,7 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
         ) : (
           <>
             {/* SEARCH */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 13, padding: '6px 6px 6px 16px' }}>
+            <div className="tv-search" style={{ display: 'flex', alignItems: 'center', gap: 12, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 13, padding: '6px 6px 6px 16px' }}>
               <SearchIcon />
               <input
                 id="trove-search"
@@ -154,8 +177,8 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
             {showShelves ? (
               /* DISCOVER LANDING — curated shelves (each its own GitHub search) */
               <div style={{ marginTop: 4 }}>
-                {SHELVES.map((s) => (
-                  <Shelf key={s.id} shelf={s} onSeeAll={onSeeAll} onOpenDetail={onOpenDetail} installedIds={installedIds} />
+                {SHELVES.map((s, i) => (
+                  <Shelf key={s.id} shelf={s} lead={i === 0} onSeeAll={onSeeAll} onOpenDetail={onOpenDetail} installedIds={installedIds} />
                 ))}
               </div>
             ) : (

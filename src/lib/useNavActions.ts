@@ -24,6 +24,8 @@ export function useNavActions() {
       if (item === 'Library') {
         setType('All');
         navigate('/library');
+      } else if (item === 'Top') {
+        navigate('/top');
       } else if (item === 'Feed') {
         navigate('/feed');
       } else {

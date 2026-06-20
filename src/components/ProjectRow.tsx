@@ -14,13 +14,15 @@ import type { Project } from '../types';
 interface Props {
   p: Project;
   installed: boolean;
+  /** When set (Top page), shows a rank cell; top 3 get a gradient badge + edge. */
+  rank?: number;
   onOpenDetail: (p: Project) => void;
   onInstall: (p: Project) => void;
   onOpen: (p: Project) => void;
   onUninstall: (p: Project) => void;
 }
 
-export function ProjectRow({ p, installed, onOpenDetail, onInstall, onOpen, onUninstall }: Props) {
+export function ProjectRow({ p, installed, rank, onOpenDetail, onInstall, onOpen, onUninstall }: Props) {
   const [open, setOpen] = useState(false);
   const topics = (p.topics || []).filter(Boolean).slice(0, 8);
   const forks = k(p.forksNum || 0);
@@ -28,7 +30,7 @@ export function ProjectRow({ p, installed, onOpenDetail, onInstall, onOpen, onUn
 
   return (
     <div
-      className="hs-row"
+      className={`hs-row${rank != null && rank <= 3 ? ' top3' : ''}`}
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'stretch',
         background: C.panel, border: `1px solid ${installed ? C.installedBorder : C.line}`, borderRadius: 13,
@@ -43,6 +45,9 @@ export function ProjectRow({ p, installed, onOpenDetail, onInstall, onOpen, onUn
         onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onOpenDetail(p))}
         style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 16px', cursor: 'pointer' }}
       >
+        {/* rank (Top page only) */}
+        {rank != null && <div className={`tv-rank${rank <= 3 ? ' badge' : ''}`}>{rank}</div>}
+
         {/* thumb */}
         <div style={{ width: 50, height: 50, borderRadius: 11, background: p.cover, flexShrink: 0, position: 'relative', overflow: 'hidden', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.08)' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(120% 100% at 80% 0%,rgba(255,255,255,.3),transparent 60%)' }} />

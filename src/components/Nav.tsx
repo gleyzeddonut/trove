@@ -9,9 +9,9 @@ import { useHistoryNav } from '../lib/useHistoryNav';
 
 // Type filtering (App/Tool/Creative) lives in the chips under the search bar,
 // so the top nav is just the three top-level destinations.
-export type NavItem = 'Discover' | 'Feed' | 'Library';
+export type NavItem = 'Discover' | 'Top' | 'Feed' | 'Library';
 
-const ITEMS: NavItem[] = ['Discover', 'Feed', 'Library'];
+const ITEMS: NavItem[] = ['Discover', 'Top', 'Feed', 'Library'];
 
 interface NavProps {
   active: NavItem | null;
