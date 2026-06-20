@@ -106,6 +106,104 @@ a {
   animation: tv-pulse 1.2s ease-in-out infinite;
 }
 
+/* Shelf card skeleton: a directional comet sweeps once per pass + the border
+   "charges" — reads as scanning, not a symmetric pulse. The comet is the motion,
+   so the inner bars stay still inside a skelcard. */
+.tv-skelcard {
+  position: relative;
+  overflow: hidden;
+  animation: tv-charge 2.1s ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+}
+.tv-skelcard .tv-skel {
+  animation: none;
+}
+.tv-skelcard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 46%;
+  transform: translateX(-160%);
+  filter: blur(6px);
+  background: linear-gradient(90deg, transparent, rgba(142, 125, 241, 0.1) 38%, rgba(167, 139, 250, 0.22) 55%, rgba(6, 182, 212, 0.16) 70%, transparent);
+  animation: tv-comet 2.1s cubic-bezier(0.55, 0, 0.45, 1) infinite;
+  animation-delay: var(--d, 0s);
+}
+.tv-skelcard::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1.5px;
+  transform: translateX(-160%);
+  background: linear-gradient(180deg, transparent, rgba(180, 160, 255, 0.55), rgba(6, 182, 212, 0.4), transparent);
+  animation: tv-comet 2.1s cubic-bezier(0.55, 0, 0.45, 1) infinite;
+  animation-delay: var(--d, 0s);
+}
+@keyframes tv-comet {
+  0% { transform: translateX(-160%); }
+  55%, 100% { transform: translateX(360%); }
+}
+@keyframes tv-charge {
+  0%, 100% { border-color: var(--tv-line); }
+  45% { border-color: rgba(142, 125, 241, 0.4); }
+  60% { border-color: rgba(6, 182, 212, 0.32); }
+}
+
+/* progressive-scan status line + forward progress bar */
+.tv-loadbar {
+  height: 2px;
+  border-radius: 2px;
+  background: var(--tv-line2);
+  overflow: hidden;
+}
+.tv-loadfill {
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #8e7df1, #06b6d4);
+  box-shadow: 0 0 10px rgba(123, 97, 255, 0.5);
+  transition: width 0.5s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.tv-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  background: #3fb950;
+  vertical-align: -2px;
+  margin-left: 2px;
+  animation: tv-blink 1s steps(1) infinite;
+}
+@keyframes tv-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/* card entrance — starts at .5 opacity so content is never fully hidden */
+@keyframes tv-cardin {
+  from { opacity: 0.5; transform: translateY(9px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+.tv-cardin {
+  animation: tv-cardin 0.45s cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tv-skelcard,
+  .tv-skelcard::before,
+  .tv-skelcard::after,
+  .tv-cardin,
+  .tv-cursor {
+    animation: none;
+  }
+  .tv-skelcard::after {
+    display: none;
+  }
+}
+
 /* Splash-matched atmosphere: dual radial glow fixed behind the app, echoing the
    boot splash. The shell keeps its opaque --tv-bg base; this sits above it but
    below the routed content (.tv-main, z-index 1). Console/MediaDock are fixed

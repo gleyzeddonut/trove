@@ -6,7 +6,7 @@
 // itself.
 
 import { useEffect, useState } from 'react';
-import { C, sans } from '../tokens';
+import { C, sans, mono } from '../tokens';
 import { ShelfCard } from './ShelfCard';
 import { useGithubSearch } from '../lib/useGithub';
 import type { Shelf as ShelfDef, ShelfIconId } from '../data/shelves';
@@ -84,9 +84,12 @@ function ShelfIcon({ id }: { id: ShelfIconId }) {
   );
 }
 
-function CardSkeleton() {
+function CardSkeleton({ delay = 0 }: { delay?: number }) {
   return (
-    <div style={{ width: 268, flexShrink: 0, boxSizing: 'border-box', background: C.panel, border: `1px solid ${C.line}`, borderRadius: 13, padding: 13, display: 'flex', flexDirection: 'column', gap: 11 }}>
+    <div
+      className="tv-skelcard"
+      style={{ width: 268, flexShrink: 0, boxSizing: 'border-box', background: C.panel, border: `1px solid ${C.line}`, borderRadius: 13, padding: 13, display: 'flex', flexDirection: 'column', gap: 11, ['--d' as string]: `${delay}s` } as React.CSSProperties}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
         <div className="tv-skel" style={{ width: 42, height: 42, borderRadius: 10, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
@@ -97,6 +100,64 @@ function CardSkeleton() {
       <div className="tv-skel" style={{ width: '100%', height: 11 }} />
       <div className="tv-skel" style={{ width: '70%', height: 11 }} />
       <div className="tv-skel" style={{ width: 90, height: 11 }} />
+    </div>
+  );
+}
+
+// Progressive scan: a terminal status line that steps through fetch stages +
+// a forward-only progress bar. Mounted only while a shelf is loading (so its
+// timers clean up on resolve). The bar position is intentionally faked — GitHub
+// gives no real progress — the point is that it always moves forward.
+const STAGE_PCT = [14, 32, 52, 70, 84];
+const LONG = [
+  'still scanning — deep in the long tail',
+  'sifting low-star, high-quality repos',
+  'cross-checking metadata',
+  'almost — holding out for the good ones',
+];
+
+function ScanStatus({ title }: { title: string }) {
+  const [step, setStep] = useState(0);
+  const [secs, setSecs] = useState(0);
+
+  useEffect(() => {
+    const start = performance.now();
+    const t = window.setInterval(() => setSecs((performance.now() - start) / 1000), 300);
+    const a = window.setInterval(() => setStep((s) => s + 1), 720);
+    return () => {
+      window.clearInterval(t);
+      window.clearInterval(a);
+    };
+  }, []);
+
+  let registry = 0;
+  try {
+    registry = parseInt(localStorage.getItem('trove.registrySize') || '', 10) || 0;
+  } catch {
+    /* ignore */
+  }
+  const stages = [
+    registry ? `searching ${registry.toLocaleString()} repos` : 'searching repositories',
+    `matching “${title}”`,
+    'ranking by stars & activity',
+    'fetching repo metadata',
+    'resolving install commands',
+  ];
+  const inStages = step < stages.length;
+  const msg = inStages ? stages[step] : LONG[(step - stages.length) % LONG.length];
+  const pct = inStages ? STAGE_PCT[step] : Math.min(95, 84 + (step - stages.length + 1) * 2.5);
+
+  return (
+    <div style={{ marginBottom: 13 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: mono, fontSize: 12, color: C.faint, marginBottom: 8 }}>
+        <span style={{ color: C.green }}>❯</span>
+        <span>{msg}</span>
+        <span className="tv-cursor" />
+        {secs > 1 && <span style={{ marginLeft: 'auto' }}>{secs.toFixed(1)}s</span>}
+      </div>
+      <div className="tv-loadbar">
+        <div className="tv-loadfill" style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }
@@ -182,6 +243,9 @@ export function Shelf({
         </button>
       </div>
 
+      {/* progressive scan status while loading (before any cards) */}
+      {!showCards && !showError && <ScanStatus title={shelf.title} />}
+
       {/* horizontal row */}
       {showError ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontFamily: sans, fontSize: 13, color: C.faint, padding: '8px 2px' }}>
@@ -197,12 +261,12 @@ export function Shelf({
       ) : (
         <div className="hv-scroll" style={{ display: 'flex', gap: 13, overflowX: 'auto', paddingBottom: 6, scrollSnapType: 'x proximity' }}>
           {showCards
-            ? items.map((p) => (
-                <div key={p.id} style={{ scrollSnapAlign: 'start' }}>
+            ? items.map((p, i) => (
+                <div key={p.id} className="tv-cardin" style={{ scrollSnapAlign: 'start', animationDelay: `${Math.min(i, 10) * 0.05}s` }}>
                   <ShelfCard p={p} installed={installedIds.has(p.id)} onOpenDetail={onOpenDetail} />
                 </div>
               ))
-            : Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
+            : Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} delay={i * 0.16} />)}
         </div>
       )}
     </section>

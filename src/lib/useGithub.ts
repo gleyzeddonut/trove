@@ -29,10 +29,11 @@ interface SearchState {
   loadMore: () => void;
 }
 
-// Session-lived cache keyed by query, so revisiting Discover (or re-running a
-// previous search) is instant and spends no API calls. Entries older than
-// FRESH_MS are still shown immediately, then refreshed in the background
-// (stale-while-revalidate). Cleared when the app is relaunched.
+// Cache keyed by query, so revisiting Discover (or re-running a previous search)
+// is instant and spends no API calls. Entries older than FRESH_MS are still
+// shown immediately, then refreshed in the background (stale-while-revalidate).
+// Persisted to localStorage (trimmed) so a relaunch paints the shelves instantly
+// from last session, then revalidates — the cold load is no longer a blank wait.
 interface SearchCacheEntry {
   results: Project[];
   total: number;
@@ -42,6 +43,42 @@ interface SearchCacheEntry {
 const searchCache = new Map<string, SearchCacheEntry>();
 const FRESH_MS = 5 * 60 * 1000;
 const keyOf = (q: string, sort: DiscoverSort) => `${sort}|${q.trim().toLowerCase()}`;
+
+// --- Persistence ---------------------------------------------------------
+const LS_CACHE = 'trove.searchCache.v1';
+const PERSIST_MAX = 24; // most-recent entries to keep
+const PERSIST_RESULTS = 24; // results stored per entry (≥ the shelf preview)
+
+(function hydrateCache() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LS_CACHE) || '{}') as Record<string, SearchCacheEntry>;
+    for (const [k, v] of Object.entries(raw)) {
+      if (v && Array.isArray(v.results)) {
+        searchCache.set(k, { results: v.results, total: v.total || 0, page: 1, ts: v.ts || 0 });
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+})();
+
+let persistTimer: number | undefined;
+function persistCache() {
+  if (persistTimer) return;
+  persistTimer = window.setTimeout(() => {
+    persistTimer = undefined;
+    try {
+      const recent = [...searchCache.entries()].sort((a, b) => b[1].ts - a[1].ts).slice(0, PERSIST_MAX);
+      const obj: Record<string, SearchCacheEntry> = {};
+      for (const [k, v] of recent) {
+        obj[k] = { results: v.results.slice(0, PERSIST_RESULTS), total: v.total, page: 1, ts: v.ts };
+      }
+      localStorage.setItem(LS_CACHE, JSON.stringify(obj));
+    } catch {
+      /* quota / serialization — fine, it's just a cache */
+    }
+  }, 400);
+}
 
 export function useGithubSearch(query: string, enabled: boolean, sort: DiscoverSort = 'stars', immediate = false): SearchState {
   // Seed initial state from cache so a revisit paints with no spinner/flash.
@@ -81,6 +118,7 @@ export function useGithubSearch(query: string, enabled: boolean, sort: DiscoverS
           .then(({ items, totalCount }) => {
             if (reqRef.current !== token) return;
             searchCache.set(key, { results: items, total: totalCount, page: 1, ts: Date.now() });
+            persistCache();
             pageRef.current = 1;
             setResults(items);
             setTotal(totalCount);
@@ -103,6 +141,7 @@ export function useGithubSearch(query: string, enabled: boolean, sort: DiscoverS
         const { items, totalCount } = await searchRepos(query, 1, sort);
         if (reqRef.current !== token) return;
         searchCache.set(key, { results: items, total: totalCount, page: 1, ts: Date.now() });
+        persistCache();
         setResults(items);
         setTotal(totalCount);
         setLoading(false);
