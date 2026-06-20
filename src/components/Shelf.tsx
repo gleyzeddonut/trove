@@ -44,9 +44,10 @@ export function Shelf({
 }) {
   const ref = useRef<HTMLElement>(null);
   const [visible, setVisible] = useState(false);
-  // Becomes true once a fetch has actually started, so we don't treat the
-  // not-yet-fetched frame (visible, but loading hasn't flipped) as "empty".
-  const fetched = useRef(false);
+  // Once visible, wait one frame so the data hook has run its effect (a cache
+  // hit resolves synchronously without ever flipping `loading`). This lets us
+  // tell "no results yet" from "confirmed empty" without flashing.
+  const [probed, setProbed] = useState(false);
 
   // Fetch only once the row scrolls near the viewport.
   useEffect(() => {
@@ -65,14 +66,23 @@ export function Shelf({
     return () => io.disconnect();
   }, [visible]);
 
-  const { results, loading, error } = useGithubSearch(shelf.query, visible, shelf.sort);
-  if (loading) fetched.current = true;
-  const items = results.slice(0, PREVIEW);
-  const settled = visible && fetched.current && !loading;
+  useEffect(() => {
+    if (!visible) return;
+    const id = requestAnimationFrame(() => setProbed(true));
+    return () => cancelAnimationFrame(id);
+  }, [visible]);
 
-  // Hide a shelf that loaded with nothing to show (kept mounted, display:none,
-  // so it collapses without leaving a gap and the observer stays valid).
-  const hide = settled && (!!error || items.length === 0);
+  const { results, loading, error } = useGithubSearch(shelf.query, visible, shelf.sort);
+  const items = results.slice(0, PREVIEW);
+  const showCards = items.length > 0;
+
+  // "Resolved" = results arrived, an error occurred, or a fetch settled with
+  // nothing (loading false after we've given it a frame). Until then we show
+  // skeletons rather than hiding, so a cached revisit paints its cards.
+  const resolved = showCards || !!error || (probed && !loading);
+  // Hide a shelf that resolved empty (kept mounted, display:none, so it
+  // collapses without a gap and the observer stays valid).
+  const hide = visible && resolved && items.length === 0;
 
   return (
     <section ref={ref} style={{ display: hide ? 'none' : 'block', marginTop: 30 }}>
@@ -92,7 +102,7 @@ export function Shelf({
 
       {/* horizontal row */}
       <div className="hv-scroll" style={{ display: 'flex', gap: 13, overflowX: 'auto', paddingBottom: 6, scrollSnapType: 'x proximity' }}>
-        {settled
+        {showCards
           ? items.map((p) => (
               <div key={p.id} style={{ scrollSnapAlign: 'start' }}>
                 <ShelfCard p={p} installed={installedIds.has(p.id)} onOpenDetail={onOpenDetail} />
