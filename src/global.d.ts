@@ -50,6 +50,8 @@ declare global {
     troveUpdater?: TroveUpdaterApi;
     troveYouTube?: TroveYouTubeApi;
     troveBrowser?: TroveBrowserApi;
+    /** Dismiss the boot splash (defined inline in index.html). */
+    __troveBootReady?: () => void;
   }
 }
 

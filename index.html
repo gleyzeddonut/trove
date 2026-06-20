@@ -11,9 +11,214 @@
       href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
+    <style>
+      /* Boot splash — plain CSS in the document head so it paints instantly,
+         before the JS bundle loads and React mounts. Always dark (terminal
+         identity), regardless of the saved theme. */
+      #boot {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background:
+          radial-gradient(120% 80% at 18% 0%, rgba(142, 125, 241, 0.14), transparent 55%),
+          radial-gradient(120% 90% at 100% 100%, rgba(6, 182, 212, 0.1), transparent 50%),
+          #08090c;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 30px;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        opacity: 1;
+        transition: opacity 0.45s ease;
+      }
+      #boot.done {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .boot-mark {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+        animation: boot-in 0.6s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+      }
+      .boot-logo {
+        width: 54px;
+        height: 54px;
+        border-radius: 15px;
+        background: conic-gradient(from 200deg, #8e7df1, #c026d3, #06b6d4, #8e7df1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 8px 30px rgba(123, 97, 255, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+      }
+      .boot-word {
+        font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+        font-weight: 800;
+        font-size: 38px;
+        letter-spacing: -1.4px;
+        color: #e7eaef;
+      }
+      .boot-word b {
+        color: #8e7df1;
+      }
+      .boot-term {
+        width: 340px;
+        min-height: 92px;
+        padding: 2px 4px;
+        font-size: 12.5px;
+        line-height: 1.85;
+        color: #6e7681;
+      }
+      .boot-term .ln {
+        opacity: 0;
+        white-space: nowrap;
+        animation: boot-line 0.25s ease forwards;
+      }
+      .boot-term .ln .ok {
+        color: #3fb950;
+      }
+      .boot-term .ln .pr {
+        color: #8e7df1;
+      }
+      .boot-term .ln:nth-child(1) {
+        animation-delay: 0.45s;
+      }
+      .boot-term .ln:nth-child(2) {
+        animation-delay: 0.85s;
+      }
+      .boot-term .ln:nth-child(3) {
+        animation-delay: 1.2s;
+      }
+      .boot-term .ln:nth-child(4) {
+        animation-delay: 1.55s;
+      }
+      .boot-cursor {
+        display: inline-block;
+        width: 7px;
+        height: 14px;
+        background: #3fb950;
+        vertical-align: -2px;
+        margin-left: 4px;
+        animation: boot-blink 1s steps(1) infinite;
+      }
+      .boot-barwrap {
+        width: 340px;
+        height: 3px;
+        border-radius: 3px;
+        background: #161b24;
+        overflow: hidden;
+      }
+      .boot-bar {
+        height: 100%;
+        width: 0;
+        border-radius: 3px;
+        background: linear-gradient(90deg, #8e7df1, #06b6d4);
+        animation: boot-fill 2s cubic-bezier(0.4, 0.1, 0.2, 1) forwards;
+      }
+      @keyframes boot-in {
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @keyframes boot-line {
+        from {
+          opacity: 0;
+          transform: translateX(-4px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @keyframes boot-fill {
+        0% {
+          width: 0;
+        }
+        35% {
+          width: 42%;
+        }
+        70% {
+          width: 73%;
+        }
+        100% {
+          width: 100%;
+        }
+      }
+      @keyframes boot-blink {
+        0%,
+        49% {
+          opacity: 1;
+        }
+        50%,
+        100% {
+          opacity: 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .boot-mark,
+        .boot-term .ln {
+          animation: none;
+          opacity: 1;
+          transform: none;
+        }
+        .boot-bar {
+          animation: none;
+          width: 100%;
+        }
+        .boot-cursor {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="boot">
+      <div class="boot-mark">
+        <div class="boot-logo">
+          <svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7l5 5-5 5M13 17h6" /></svg>
+        </div>
+        <div class="boot-word">Tro<b>v</b>e</div>
+      </div>
+      <div class="boot-term">
+        <div class="ln"><span class="pr">❯</span> trove init</div>
+        <div class="ln"><span class="ok">✓</span> mounting registry · 198,442,310 repos</div>
+        <div class="ln"><span class="ok">✓</span> connecting terminal</div>
+        <div class="ln">starting storefront<span class="boot-cursor"></span></div>
+      </div>
+      <div class="boot-barwrap"><div class="boot-bar"></div></div>
+    </div>
     <div id="root"></div>
+    <script>
+      // Dismiss the boot splash once the storefront has loaded behind it (the
+      // app calls window.__troveBootReady), with a minimum on-screen time so the
+      // boot sequence reads and a hard cap so a slow/offline network can't hang
+      // it. Runs before the deferred module bundle, so the hook exists in time.
+      (function () {
+        var boot = document.getElementById('boot');
+        if (!boot) return;
+        var start = performance.now();
+        var MIN = 2400; // floor so the animation + a cursor blink read
+        var MAX = 9000; // ceiling so we never wait forever on the network
+        var fired = false;
+        function finish() {
+          if (fired) return;
+          fired = true;
+          var wait = Math.max(0, MIN - (performance.now() - start));
+          setTimeout(function () {
+            boot.classList.add('done');
+            setTimeout(function () {
+              if (boot.parentNode) boot.parentNode.removeChild(boot);
+            }, 500);
+          }, wait);
+        }
+        window.__troveBootReady = finish;
+        setTimeout(finish, MAX);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

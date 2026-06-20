@@ -2,6 +2,7 @@
 // Discover pulls live repositories from GitHub; Library reads the persisted
 // set of installed projects. Search, type chips, results, empty/loading/error.
 
+import { useEffect } from 'react';
 import { C, mono, sans } from '../tokens';
 import { Nav, type NavItem } from '../components/Nav';
 import { TypeChip } from '../components/TypeChip';
@@ -49,6 +50,12 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
   // search it'd just be ranking the default popular set, so fall back to stars.
   const effectiveSort = !q && discoverSort === 'best' ? 'stars' : discoverSort;
   const { results: remote, total, loading, loadingMore, error, hasMore, loadMore } = useGithubSearch(query, !isLib, effectiveSort);
+
+  // Once the storefront has data behind it, dismiss the boot splash (it has its
+  // own minimum on-screen time + a max cap, so a single call is enough).
+  useEffect(() => {
+    if (!loading) window.__troveBootReady?.();
+  }, [loading]);
 
   const installedIds = new Set(installed.map((p) => p.id));
 
