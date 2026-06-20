@@ -43,7 +43,7 @@ const searchCache = new Map<string, SearchCacheEntry>();
 const FRESH_MS = 5 * 60 * 1000;
 const keyOf = (q: string, sort: DiscoverSort) => `${sort}|${q.trim().toLowerCase()}`;
 
-export function useGithubSearch(query: string, enabled: boolean, sort: DiscoverSort = 'stars'): SearchState {
+export function useGithubSearch(query: string, enabled: boolean, sort: DiscoverSort = 'stars', immediate = false): SearchState {
   // Seed initial state from cache so a revisit paints with no spinner/flash.
   const seed = enabled ? searchCache.get(keyOf(query, sort)) : undefined;
   const [results, setResults] = useState<Project[]>(seed?.results ?? []);
@@ -96,7 +96,8 @@ export function useGithubSearch(query: string, enabled: boolean, sort: DiscoverS
     pageRef.current = 1;
     setLoading(true);
     setError(null);
-    const delay = query.trim() ? 420 : 0;
+    // Debounce typed queries; shelves (immediate) and the default load fire now.
+    const delay = immediate || !query.trim() ? 0 : 420;
     const id = window.setTimeout(async () => {
       try {
         const { items, totalCount } = await searchRepos(query, 1, sort);
@@ -114,7 +115,7 @@ export function useGithubSearch(query: string, enabled: boolean, sort: DiscoverS
       }
     }, delay);
     return () => window.clearTimeout(id);
-  }, [query, enabled, sort]);
+  }, [query, enabled, sort, immediate]);
 
   const loadMore = useCallback(async () => {
     if (loading || loadingMore) return;

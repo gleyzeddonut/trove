@@ -86,7 +86,8 @@ export function Shelf({
           io.disconnect();
         }
       },
-      { rootMargin: '300px' },
+      // Generous lead so a shelf finishes loading before you scroll to it.
+      { rootMargin: '900px' },
     );
     io.observe(el);
     return () => io.disconnect();
@@ -98,7 +99,7 @@ export function Shelf({
     return () => cancelAnimationFrame(id);
   }, [visible]);
 
-  const { results, loading, error } = useGithubSearch(shelf.query, visible, shelf.sort);
+  const { results, loading, error } = useGithubSearch(shelf.query, visible, shelf.sort, true);
   const items = results.slice(0, PREVIEW);
   const showCards = items.length > 0;
 
