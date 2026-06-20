@@ -5,14 +5,7 @@ import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTroveStore } from '../store/useTroveStore';
 import type { NavItem } from '../components/Nav';
-import type { Project, TypeFilter } from '../types';
-
-const TYPE_FOR: Record<'Discover' | 'Apps' | 'Tools' | 'Creative', TypeFilter> = {
-  Discover: 'All',
-  Apps: 'App',
-  Tools: 'Tool',
-  Creative: 'Creative',
-};
+import type { Project } from '../types';
 
 export function useNavActions() {
   const navigate = useNavigate();
@@ -34,7 +27,8 @@ export function useNavActions() {
       } else if (item === 'Feed') {
         navigate('/feed');
       } else {
-        setType(TYPE_FOR[item]);
+        // Discover
+        setType('All');
         navigate('/');
       }
       scrollTop();

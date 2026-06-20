@@ -65,11 +65,9 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
     t === 'All' ? base.length : base.filter((p) => p.type === t).length;
   const installedCount = installed.length;
 
-  const activeNav: NavItem = isLib
-    ? 'Library'
-    : (
-        { All: 'Discover', App: 'Apps', Tool: 'Tools', Creative: 'Creative', Library: 'Discover' } as const
-      )[typeFilter] ?? 'Discover';
+  // Type is reflected by the chips now, so Discover stays highlighted for any
+  // type filter.
+  const activeNav: NavItem = isLib ? 'Library' : 'Discover';
 
   return (
     <div style={{ minHeight: '100%', background: C.bg, fontFamily: sans, color: C.ink }}>

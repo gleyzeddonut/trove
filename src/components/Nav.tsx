@@ -7,9 +7,11 @@ import { UpdateButton } from './UpdateButton';
 import { useTroveStore } from '../store/useTroveStore';
 import { useHistoryNav } from '../lib/useHistoryNav';
 
-export type NavItem = 'Discover' | 'Feed' | 'Apps' | 'Tools' | 'Creative' | 'Library';
+// Type filtering (App/Tool/Creative) lives in the chips under the search bar,
+// so the top nav is just the three top-level destinations.
+export type NavItem = 'Discover' | 'Feed' | 'Library';
 
-const ITEMS: NavItem[] = ['Discover', 'Feed', 'Apps', 'Tools', 'Creative', 'Library'];
+const ITEMS: NavItem[] = ['Discover', 'Feed', 'Library'];
 
 interface NavProps {
   active: NavItem | null;
