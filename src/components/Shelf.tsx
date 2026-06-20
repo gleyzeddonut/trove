@@ -5,14 +5,14 @@
 // all" and revisits are instant. A shelf that errors or comes back empty hides
 // itself.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { C, sans } from '../tokens';
 import { ShelfCard } from './ShelfCard';
 import { useGithubSearch } from '../lib/useGithub';
 import type { Shelf as ShelfDef, ShelfIconId } from '../data/shelves';
 import type { Project } from '../types';
 
-const PREVIEW = 12;
+const PREVIEW = 20;
 
 // Custom duotone icon set echoing the splash gradient: a purple primary
 // (currentColor) + a cyan accent (var(--ic2)). On the gradient lead tile, the
@@ -114,38 +114,21 @@ export function Shelf({
   onOpenDetail: (p: Project) => void;
   installedIds: Set<string>;
 }) {
-  const ref = useRef<HTMLElement>(null);
-  const [visible, setVisible] = useState(false);
-  // Once visible, wait one frame so the data hook has run its effect (a cache
-  // hit resolves synchronously without ever flipping `loading`). This lets us
-  // tell "no results yet" from "confirmed empty" without flashing.
+  // Fetch eagerly from mount (the data layer throttles concurrency), so even a
+  // fast scroll finds shelves already loading/loaded — not starting on arrival.
+  const [enabled, setEnabled] = useState(true);
+  // Wait one frame so the data hook has run its effect (a cache hit resolves
+  // synchronously without ever flipping `loading`); lets us tell "no results
+  // yet" from "confirmed empty" without flashing.
   const [probed, setProbed] = useState(false);
 
-  // Fetch only once the row scrolls near the viewport.
   useEffect(() => {
-    const el = ref.current;
-    if (!el || visible) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          setVisible(true);
-          io.disconnect();
-        }
-      },
-      // Generous lead so a shelf finishes loading before you scroll to it.
-      { rootMargin: '900px' },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [visible]);
-
-  useEffect(() => {
-    if (!visible) return;
+    if (!enabled) return;
     const id = requestAnimationFrame(() => setProbed(true));
     return () => cancelAnimationFrame(id);
-  }, [visible]);
+  }, [enabled]);
 
-  const { results, loading, error } = useGithubSearch(shelf.query, visible, shelf.sort, true);
+  const { results, loading, error } = useGithubSearch(shelf.query, enabled, shelf.sort, true);
   const items = results.slice(0, PREVIEW);
   const showCards = items.length > 0;
 
@@ -155,14 +138,14 @@ export function Shelf({
   const resolved = showCards || !!error || (probed && !loading);
   // Hide only a shelf that genuinely resolved *empty* — never on a (usually
   // transient) error, which would make rows vanish. display:none keeps it
-  // mounted so it collapses without a gap and the observer stays valid.
-  const hide = visible && resolved && !error && items.length === 0;
-  const showError = visible && !loading && !!error && items.length === 0;
+  // mounted so it collapses without leaving a gap.
+  const hide = resolved && !error && items.length === 0;
+  const showError = !loading && !!error && items.length === 0;
 
-  // Re-run the fetch (errors aren't cached, so toggling visibility refetches).
+  // Re-run the fetch (errors aren't cached, so toggling enabled refetches).
   const retry = () => {
-    setVisible(false);
-    requestAnimationFrame(() => setVisible(true));
+    setEnabled(false);
+    requestAnimationFrame(() => setEnabled(true));
   };
 
   // The first shelf to show real content dismisses the boot splash — so it
@@ -173,7 +156,7 @@ export function Shelf({
   }, [showCards]);
 
   return (
-    <section ref={ref} style={{ display: hide ? 'none' : 'block', marginTop: 30 }}>
+    <section style={{ display: hide ? 'none' : 'block', marginTop: 30 }}>
       {/* header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 13 }}>
         <span className="hs-tip" data-tip={shelf.description} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, cursor: 'default' }}>

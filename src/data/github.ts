@@ -445,7 +445,7 @@ export const SEARCH_MAX_PAGE = 10;
 let searchInFlight = 0;
 const searchWaiters: Array<() => void> = [];
 async function withSearchSlot<T>(fn: () => Promise<T>): Promise<T> {
-  if (searchInFlight >= 2) await new Promise<void>((resolve) => searchWaiters.push(resolve));
+  if (searchInFlight >= 3) await new Promise<void>((resolve) => searchWaiters.push(resolve));
   searchInFlight++;
   try {
     return await fn();
