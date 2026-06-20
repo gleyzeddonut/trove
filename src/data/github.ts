@@ -438,6 +438,23 @@ export interface SearchPage {
 export const SEARCH_PER_PAGE = 100;
 export const SEARCH_MAX_PAGE = 10;
 
+// GitHub's search endpoint trips a *secondary* rate limit on bursts / concurrent
+// calls (it wants search requests made serially), which would error out shelves
+// loading at once. Funnel all search calls through a small semaphore so at most
+// a couple are ever in flight.
+let searchInFlight = 0;
+const searchWaiters: Array<() => void> = [];
+async function withSearchSlot<T>(fn: () => Promise<T>): Promise<T> {
+  if (searchInFlight >= 2) await new Promise<void>((resolve) => searchWaiters.push(resolve));
+  searchInFlight++;
+  try {
+    return await fn();
+  } finally {
+    searchInFlight--;
+    searchWaiters.shift()?.();
+  }
+}
+
 /** How Discover results are ordered. 'best' = GitHub relevance (no sort param). */
 export type DiscoverSort = 'stars' | 'forks' | 'updated' | 'best';
 
@@ -447,8 +464,10 @@ export async function searchRepos(query: string, page = 1, sort: DiscoverSort = 
   // GitHub's Search API takes sort=stars|forks|updated (+order); omitting it
   // sorts by best match (relevance).
   const sortParam = sort === 'best' ? '' : `&sort=${sort}&order=desc`;
-  const data = await ghJson<{ items: GhRepo[]; total_count: number }>(
-    `/search/repositories?q=${encodeURIComponent(q)}${sortParam}&per_page=${SEARCH_PER_PAGE}&page=${page}`,
+  const data = await withSearchSlot(() =>
+    ghJson<{ items: GhRepo[]; total_count: number }>(
+      `/search/repositories?q=${encodeURIComponent(q)}${sortParam}&per_page=${SEARCH_PER_PAGE}&page=${page}`,
+    ),
   );
   return {
     items: (data.items || []).map(mapRepo),
@@ -460,7 +479,9 @@ export async function searchRepos(query: string, page = 1, sort: DiscoverSort = 
 // the boot splash. Persisted by the caller so the splash can read last
 // session's value before the bundle loads.
 export async function fetchRegistrySize(): Promise<number> {
-  const data = await ghJson<{ total_count: number }>('/search/repositories?q=stars:>0&per_page=1');
+  const data = await withSearchSlot(() =>
+    ghJson<{ total_count: number }>('/search/repositories?q=stars:>0&per_page=1'),
+  );
   return data.total_count || 0;
 }
 

@@ -107,9 +107,17 @@ export function Shelf({
   // nothing (loading false after we've given it a frame). Until then we show
   // skeletons rather than hiding, so a cached revisit paints its cards.
   const resolved = showCards || !!error || (probed && !loading);
-  // Hide a shelf that resolved empty (kept mounted, display:none, so it
-  // collapses without a gap and the observer stays valid).
-  const hide = visible && resolved && items.length === 0;
+  // Hide only a shelf that genuinely resolved *empty* — never on a (usually
+  // transient) error, which would make rows vanish. display:none keeps it
+  // mounted so it collapses without a gap and the observer stays valid.
+  const hide = visible && resolved && !error && items.length === 0;
+  const showError = visible && !loading && !!error && items.length === 0;
+
+  // Re-run the fetch (errors aren't cached, so toggling visibility refetches).
+  const retry = () => {
+    setVisible(false);
+    requestAnimationFrame(() => setVisible(true));
+  };
 
   // The first shelf to show real content dismisses the boot splash — so it
   // holds until the storefront actually has cards behind it (the splash dedupes
@@ -139,15 +147,28 @@ export function Shelf({
       </div>
 
       {/* horizontal row */}
-      <div className="hv-scroll" style={{ display: 'flex', gap: 13, overflowX: 'auto', paddingBottom: 6, scrollSnapType: 'x proximity' }}>
-        {showCards
-          ? items.map((p) => (
-              <div key={p.id} style={{ scrollSnapAlign: 'start' }}>
-                <ShelfCard p={p} installed={installedIds.has(p.id)} onOpenDetail={onOpenDetail} />
-              </div>
-            ))
-          : Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
-      </div>
+      {showError ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontFamily: sans, fontSize: 13, color: C.faint, padding: '8px 2px' }}>
+          Couldn't load this shelf.
+          <button
+            onClick={retry}
+            className="hs-seeall"
+            style={{ border: 'none', background: 'transparent', color: C.accent, fontFamily: sans, fontSize: 13, fontWeight: 700, cursor: 'pointer', padding: 0 }}
+          >
+            Retry
+          </button>
+        </div>
+      ) : (
+        <div className="hv-scroll" style={{ display: 'flex', gap: 13, overflowX: 'auto', paddingBottom: 6, scrollSnapType: 'x proximity' }}>
+          {showCards
+            ? items.map((p) => (
+                <div key={p.id} style={{ scrollSnapAlign: 'start' }}>
+                  <ShelfCard p={p} installed={installedIds.has(p.id)} onOpenDetail={onOpenDetail} />
+                </div>
+              ))
+            : Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
+        </div>
+      )}
     </section>
   );
 }
