@@ -456,6 +456,14 @@ export async function searchRepos(query: string, page = 1, sort: DiscoverSort = 
   };
 }
 
+// Real count of indexed public repos (everything with at least one star), for
+// the boot splash. Persisted by the caller so the splash can read last
+// session's value before the bundle loads.
+export async function fetchRegistrySize(): Promise<number> {
+  const data = await ghJson<{ total_count: number }>('/search/repositories?q=stars:>0&per_page=1');
+  return data.total_count || 0;
+}
+
 export interface RepoDetail {
   project: Project;
   contributors: Contributor[];

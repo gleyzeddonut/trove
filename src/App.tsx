@@ -16,6 +16,7 @@ import { BrowserChrome } from './components/browser/BrowserChrome';
 import { WebTabView } from './components/browser/WebTabView';
 import { useTroveStore } from './store/useTroveStore';
 import { applyTheme } from './lib/settings';
+import { fetchRegistrySize } from './data/github';
 
 export default function App() {
   const consoleOpen = useTroveStore((s) => s.consoleOpen);
@@ -36,6 +37,15 @@ export default function App() {
   useEffect(() => {
     applyTheme(useTroveStore.getState().settings);
     useTroveStore.getState().hydrateAccount();
+
+    // Refresh the real registry size for the next launch's boot splash.
+    fetchRegistrySize()
+      .then((n) => {
+        if (n > 0) localStorage.setItem('trove.registrySize', String(n));
+      })
+      .catch(() => {
+        /* offline / rate-limited — keep last value */
+      });
 
     // Sync theme across windows (e.g. the popped-out terminal) — the other
     // window changing settings fires a `storage` event here.
