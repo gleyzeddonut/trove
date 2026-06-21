@@ -80,6 +80,21 @@ function persistCache() {
   }, 400);
 }
 
+// Warm a query into the cache ahead of time (e.g. preload the Top page) so
+// navigating to it paints instantly. No-op if already cached and still fresh.
+export async function prefetchSearch(query: string, sort: DiscoverSort = 'stars'): Promise<void> {
+  const key = keyOf(query, sort);
+  const cached = searchCache.get(key);
+  if (cached && Date.now() - cached.ts < FRESH_MS) return;
+  try {
+    const { items, totalCount } = await searchRepos(query, 1, sort);
+    searchCache.set(key, { results: items, total: totalCount, page: 1, ts: Date.now() });
+    persistCache();
+  } catch {
+    /* best-effort warmup */
+  }
+}
+
 export function useGithubSearch(query: string, enabled: boolean, sort: DiscoverSort = 'stars', immediate = false): SearchState {
   // Seed initial state from cache so a revisit paints with no spinner/flash.
   const seed = enabled ? searchCache.get(keyOf(query, sort)) : undefined;

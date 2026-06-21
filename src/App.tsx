@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { CONSOLE_COLLAPSED_H, TABBAR_H } from './tokens';
 import { Storefront } from './pages/Storefront';
-import { Top } from './pages/Top';
+import { Top, prefetchTop } from './pages/Top';
 import { Detail } from './pages/Detail';
 import { Feed } from './pages/Feed';
 import { Creator } from './pages/Creator';
@@ -48,6 +48,10 @@ export default function App() {
         /* offline / rate-limited — keep last value */
       });
 
+    // Warm the Top page in the background (after Discover's shelves load) so
+    // switching to it is instant. Throttled with the shelf searches anyway.
+    const warm = window.setTimeout(prefetchTop, 2200);
+
     // Sync theme across windows (e.g. the popped-out terminal) — the other
     // window changing settings fires a `storage` event here.
     const onStorage = (e: StorageEvent) => {
@@ -67,6 +71,7 @@ export default function App() {
     mq?.addEventListener('change', onChange);
 
     return () => {
+      window.clearTimeout(warm);
       window.removeEventListener('storage', onStorage);
       mq?.removeEventListener('change', onChange);
     };

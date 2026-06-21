@@ -7,7 +7,8 @@ import { useState } from 'react';
 import { C, mono, sans } from '../tokens';
 import { Nav } from '../components/Nav';
 import { ProjectRow } from '../components/ProjectRow';
-import { useGithubSearch } from '../lib/useGithub';
+import { ScanStatus, registryCount } from '../components/ScanStatus';
+import { useGithubSearch, prefetchSearch } from '../lib/useGithub';
 import { useTroveStore } from '../store/useTroveStore';
 import { useNavActions } from '../lib/useNavActions';
 
@@ -26,6 +27,11 @@ function windowQuery(w: Win): string {
   const days = w === 'today' ? 1 : w === 'week' ? 7 : 30;
   const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
   return `created:>=${since}`;
+}
+
+// Warm the default Top view (this week) so switching to the tab is instant.
+export function prefetchTop(): void {
+  void prefetchSearch(windowQuery('week'), 'stars');
 }
 
 export function Top() {
@@ -74,19 +80,30 @@ export function Top() {
 
         {/* states */}
         {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 16px', background: C.panel, border: `1px solid ${C.line}`, borderRadius: 13 }}>
-                <div className="tv-skel" style={{ width: 30, height: 22, borderRadius: 6, flexShrink: 0 }} />
-                <div className="tv-skel" style={{ width: 50, height: 50, borderRadius: 11, flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div className="tv-skel" style={{ width: '32%', height: 13 }} />
-                  <div className="tv-skel" style={{ width: '62%', height: 11 }} />
+          <>
+            <ScanStatus
+              stages={[
+                registryCount() ? `scanning ${registryCount().toLocaleString()} repos` : 'scanning repositories',
+                'ranking by stars',
+                `windowing · ${scope}`,
+                'fetching repo metadata',
+                'resolving install commands',
+              ]}
+            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="tv-skelcard" style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 16px', background: C.panel, border: `1px solid ${C.line}`, borderRadius: 13, ['--d' as string]: `${i * 0.1}s` } as React.CSSProperties}>
+                  <div className="tv-skel" style={{ width: 30, height: 22, borderRadius: 6, flexShrink: 0 }} />
+                  <div className="tv-skel" style={{ width: 50, height: 50, borderRadius: 11, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div className="tv-skel" style={{ width: '32%', height: 13 }} />
+                    <div className="tv-skel" style={{ width: '62%', height: 11 }} />
+                  </div>
+                  <div className="tv-skel" style={{ width: 156, height: 32, borderRadius: 9, flexShrink: 0 }} />
                 </div>
-                <div className="tv-skel" style={{ width: 156, height: 32, borderRadius: 9, flexShrink: 0 }} />
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         ) : error ? (
           <div style={{ padding: '48px 24px', textAlign: 'center', color: C.sub, fontFamily: sans, fontSize: 14.5, lineHeight: 1.6 }}>
             <div style={{ color: C.red, fontFamily: mono, fontSize: 13, marginBottom: 8 }}>{error}</div>

@@ -6,8 +6,9 @@
 // itself.
 
 import { useEffect, useState } from 'react';
-import { C, sans, mono } from '../tokens';
+import { C, sans } from '../tokens';
 import { ShelfCard } from './ShelfCard';
+import { ScanStatus, registryCount } from './ScanStatus';
 import { useGithubSearch } from '../lib/useGithub';
 import type { Shelf as ShelfDef, ShelfIconId } from '../data/shelves';
 import type { Project } from '../types';
@@ -104,62 +105,16 @@ function CardSkeleton({ delay = 0 }: { delay?: number }) {
   );
 }
 
-// Progressive scan: a terminal status line that steps through fetch stages +
-// a forward-only progress bar. Mounted only while a shelf is loading (so its
-// timers clean up on resolve). The bar position is intentionally faked — GitHub
-// gives no real progress — the point is that it always moves forward.
-const STAGE_PCT = [14, 32, 52, 70, 84];
-const LONG = [
-  'still scanning — deep in the long tail',
-  'sifting low-star, high-quality repos',
-  'cross-checking metadata',
-  'almost — holding out for the good ones',
-];
-
-function ScanStatus({ title }: { title: string }) {
-  const [step, setStep] = useState(0);
-  const [secs, setSecs] = useState(0);
-
-  useEffect(() => {
-    const start = performance.now();
-    const t = window.setInterval(() => setSecs((performance.now() - start) / 1000), 300);
-    const a = window.setInterval(() => setStep((s) => s + 1), 720);
-    return () => {
-      window.clearInterval(t);
-      window.clearInterval(a);
-    };
-  }, []);
-
-  let registry = 0;
-  try {
-    registry = parseInt(localStorage.getItem('trove.registrySize') || '', 10) || 0;
-  } catch {
-    /* ignore */
-  }
-  const stages = [
-    registry ? `searching ${registry.toLocaleString()} repos` : 'searching repositories',
+// Stages for a shelf's progressive-scan status (see <ScanStatus>).
+function shelfStages(title: string): string[] {
+  const reg = registryCount();
+  return [
+    reg ? `searching ${reg.toLocaleString()} repos` : 'searching repositories',
     `matching “${title}”`,
     'ranking by stars & activity',
     'fetching repo metadata',
     'resolving install commands',
   ];
-  const inStages = step < stages.length;
-  const msg = inStages ? stages[step] : LONG[(step - stages.length) % LONG.length];
-  const pct = inStages ? STAGE_PCT[step] : Math.min(95, 84 + (step - stages.length + 1) * 2.5);
-
-  return (
-    <div style={{ marginBottom: 13 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: mono, fontSize: 12, color: C.faint, marginBottom: 8 }}>
-        <span style={{ color: C.green }}>❯</span>
-        <span>{msg}</span>
-        <span className="tv-cursor" />
-        {secs > 1 && <span style={{ marginLeft: 'auto' }}>{secs.toFixed(1)}s</span>}
-      </div>
-      <div className="tv-loadbar">
-        <div className="tv-loadfill" style={{ width: `${pct}%` }} />
-      </div>
-    </div>
-  );
 }
 
 export function Shelf({
@@ -256,7 +211,7 @@ export function Shelf({
       </div>
 
       {/* progressive scan status while loading (before any cards) */}
-      {!showCards && !showError && <ScanStatus title={shelf.title} />}
+      {!showCards && !showError && <ScanStatus stages={shelfStages(shelf.title)} />}
 
       {/* horizontal row */}
       {showError ? (

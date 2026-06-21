@@ -8,6 +8,7 @@ import { Nav, type NavItem } from '../components/Nav';
 import { TypeChip } from '../components/TypeChip';
 import { ProjectRow } from '../components/ProjectRow';
 import { Shelf } from '../components/Shelf';
+import { ScanStatus, registryCount } from '../components/ScanStatus';
 import { SortMenu } from '../components/SortMenu';
 import { Box, SearchIcon } from '../components/icons';
 import { TROVE_TYPES } from '../data/constants';
@@ -230,18 +231,29 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
 
             {/* STATES */}
             {!isLib && loading ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 16px', background: C.panel, border: `1px solid ${C.line}`, borderRadius: 13 }}>
-                    <div className="tv-skel" style={{ width: 50, height: 50, borderRadius: 11, flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div className="tv-skel" style={{ width: '32%', height: 13 }} />
-                      <div className="tv-skel" style={{ width: '62%', height: 11 }} />
+              <>
+                <ScanStatus
+                  stages={[
+                    registryCount() ? `searching ${registryCount().toLocaleString()} repos` : 'searching repositories',
+                    q ? `matching “${q}”` : 'ranking by stars',
+                    'ranking results',
+                    'fetching repo metadata',
+                    'resolving install commands',
+                  ]}
+                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="tv-skelcard" style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 16px', background: C.panel, border: `1px solid ${C.line}`, borderRadius: 13, ['--d' as string]: `${i * 0.1}s` } as React.CSSProperties}>
+                      <div className="tv-skel" style={{ width: 50, height: 50, borderRadius: 11, flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div className="tv-skel" style={{ width: '32%', height: 13 }} />
+                        <div className="tv-skel" style={{ width: '62%', height: 11 }} />
+                      </div>
+                      <div className="tv-skel" style={{ width: 156, height: 32, borderRadius: 9, flexShrink: 0 }} />
                     </div>
-                    <div className="tv-skel" style={{ width: 156, height: 32, borderRadius: 9, flexShrink: 0 }} />
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </>
             ) : !isLib && error ? (
               <div style={{ padding: '48px 24px', textAlign: 'center', color: C.sub, fontFamily: sans, fontSize: 14.5, lineHeight: 1.6 }}>
                 <div style={{ color: C.red, fontFamily: mono, fontSize: 13, marginBottom: 8 }}>{error}</div>
