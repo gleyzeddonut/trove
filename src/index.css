@@ -574,9 +574,14 @@ a {
 }
 .md img {
   max-width: 100%;
-  height: auto;
   border-radius: 8px;
   vertical-align: middle;
+}
+/* Only auto-size images the README didn't give an explicit height — otherwise
+   respect height="N" (many logos are SVGs with no intrinsic size that rely on
+   it; forcing height:auto + max-width blew them up to full width). */
+.md img:not([height]) {
+  height: auto;
 }
 .md code {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
