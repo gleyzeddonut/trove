@@ -221,14 +221,13 @@ export function Shelf({
       {/* header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 13 }}>
         <span
-          className="hs-tip hs-shelfhead"
-          data-tip={shelf.description}
+          className="hs-shelfhead"
           role="link"
           tabIndex={0}
           aria-label={`See all ${shelf.title}`}
           onClick={() => onSeeAll(shelf)}
           onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onSeeAll(shelf))}
-          style={{ position: 'relative', zIndex: 5, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', minWidth: 0 }}
         >
           <span
             style={{
@@ -240,9 +239,13 @@ export function Shelf({
           >
             <ShelfIcon id={shelf.icon} />
           </span>
-          <h2 style={{ margin: 0, fontFamily: sans, fontSize: 17, fontWeight: 700, letterSpacing: -0.3, color: C.ink }}>{shelf.title}</h2>
+          <h2 style={{ margin: 0, fontFamily: sans, fontSize: 17, fontWeight: 700, letterSpacing: -0.3, color: C.ink, flexShrink: 0 }}>{shelf.title}</h2>
+          {/* inline description (replaces the old hover tooltip) */}
+          <span style={{ fontFamily: sans, fontSize: 13, fontWeight: 500, color: C.faint, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1 }}>
+            — {shelf.description}
+          </span>
         </span>
-        <div style={{ flex: 1 }} />
+        <div style={{ flex: 1, minWidth: 16 }} />
         <button
           onClick={() => onSeeAll(shelf)}
           className="hs-seeall"

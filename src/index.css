@@ -258,34 +258,6 @@ a {
 .hs-shelfhead:hover {
   opacity: 0.78;
 }
-/* shelf header hover tooltip (description) */
-.hs-tip::after {
-  content: attr(data-tip);
-  position: absolute;
-  left: 0;
-  top: calc(100% + 9px);
-  z-index: 6;
-  width: max-content;
-  max-width: 280px;
-  background: var(--tv-panel);
-  border: 1px solid var(--tv-line);
-  color: var(--tv-sub);
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  font-size: 12.5px;
-  font-weight: 500;
-  line-height: 1.45;
-  padding: 9px 12px;
-  border-radius: 10px;
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.32);
-  opacity: 0;
-  transform: translateY(-3px);
-  pointer-events: none;
-  transition: opacity 0.14s, transform 0.14s;
-}
-.hs-tip:hover::after {
-  opacity: 1;
-  transform: translateY(0);
-}
 
 /* search focus glow */
 .tv-search {
