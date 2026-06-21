@@ -138,7 +138,7 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
               {installedCount > 0 && <span style={{ color: C.green, fontWeight: 700 }}> · {installedCount} installed</span>}
             </p>
             {/* signature gradient hairline (Discover only) */}
-            <div style={{ height: 2, maxWidth: 340, borderRadius: 2, margin: '20px 0 22px', background: 'linear-gradient(90deg,#8e7df1,#06b6d4 60%,transparent)' }} />
+            <div style={{ height: 2, maxWidth: 340, borderRadius: 2, margin: '20px 0 22px', background: 'linear-gradient(90deg,var(--tv-accent),#06b6d4 60%,transparent)' }} />
           </>
         )}
 

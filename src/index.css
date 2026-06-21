@@ -127,7 +127,7 @@ a {
   width: 46%;
   transform: translateX(-160%);
   filter: blur(6px);
-  background: linear-gradient(90deg, transparent, rgba(142, 125, 241, 0.1) 38%, rgba(167, 139, 250, 0.22) 55%, rgba(6, 182, 212, 0.16) 70%, transparent);
+  background: linear-gradient(90deg, transparent, rgb(from var(--tv-accent) r g b / 0.1) 38%, rgba(167, 139, 250, 0.22) 55%, rgba(6, 182, 212, 0.16) 70%, transparent);
   animation: tv-comet 2.1s cubic-bezier(0.55, 0, 0.45, 1) infinite;
   animation-delay: var(--d, 0s);
 }
@@ -149,7 +149,7 @@ a {
 }
 @keyframes tv-charge {
   0%, 100% { border-color: var(--tv-line); }
-  45% { border-color: rgba(142, 125, 241, 0.4); }
+  45% { border-color: rgb(from var(--tv-accent) r g b / 0.4); }
   60% { border-color: rgba(6, 182, 212, 0.32); }
 }
 
@@ -164,8 +164,8 @@ a {
   height: 100%;
   width: 0;
   border-radius: 2px;
-  background: linear-gradient(90deg, #8e7df1, #06b6d4);
-  box-shadow: 0 0 10px rgba(123, 97, 255, 0.5);
+  background: linear-gradient(90deg, var(--tv-accent), #06b6d4);
+  box-shadow: 0 0 10px rgb(from var(--tv-accent) r g b / 0.5);
   transition: width 0.5s cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 .tv-cursor {
@@ -215,12 +215,12 @@ a {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(120% 80% at 16% -4%, rgba(142, 125, 241, 0.16), transparent 52%),
+    radial-gradient(120% 80% at 16% -4%, rgb(from var(--tv-accent) r g b / 0.16), transparent 52%),
     radial-gradient(120% 90% at 102% 104%, rgba(6, 182, 212, 0.12), transparent 50%);
 }
 [data-theme='light'] .tv-app::before {
   background:
-    radial-gradient(120% 80% at 16% -4%, rgba(142, 125, 241, 0.1), transparent 52%),
+    radial-gradient(120% 80% at 16% -4%, rgb(from var(--tv-accent) r g b / 0.1), transparent 52%),
     radial-gradient(120% 90% at 102% 104%, rgba(6, 182, 212, 0.07), transparent 50%);
 }
 .tv-main {
@@ -264,12 +264,12 @@ a {
   transition: border-color 0.15s, box-shadow 0.2s;
 }
 .tv-search:focus-within {
-  border-color: rgba(142, 125, 241, 0.5);
-  box-shadow: 0 0 0 3px rgba(142, 125, 241, 0.12), 0 8px 30px rgba(123, 97, 255, 0.1);
+  border-color: rgb(from var(--tv-accent) r g b / 0.5);
+  box-shadow: 0 0 0 3px rgb(from var(--tv-accent) r g b / 0.12), 0 8px 30px rgb(from var(--tv-accent) r g b / 0.1);
 }
 /* faint branded lift on shelf cards (dark) */
 [data-theme='dark'] .hs-card:hover {
-  box-shadow: 0 14px 34px rgba(123, 97, 255, 0.12);
+  box-shadow: 0 14px 34px rgb(from var(--tv-accent) r g b / 0.12);
 }
 
 /* --- Top page (leaderboard) --------------------------------------------- */
@@ -294,8 +294,8 @@ a {
 }
 [data-theme='dark'] .tv-rank.badge {
   color: #fff;
-  background: linear-gradient(135deg, #8e7df1, #06b6d4);
-  box-shadow: 0 3px 12px rgba(123, 97, 255, 0.32);
+  background: linear-gradient(135deg, var(--tv-accent), #06b6d4);
+  box-shadow: 0 3px 12px rgb(from var(--tv-accent) r g b / 0.32);
 }
 .hs-row.top3 {
   position: relative;
@@ -308,7 +308,7 @@ a {
   top: 0;
   bottom: 0;
   width: 3px;
-  background: linear-gradient(180deg, #8e7df1, #06b6d4);
+  background: linear-gradient(180deg, var(--tv-accent), #06b6d4);
 }
 .tv-seg {
   display: inline-flex;
@@ -336,8 +336,8 @@ a {
 }
 [data-theme='dark'] .tv-seg button.on {
   color: #fff;
-  background: linear-gradient(135deg, #8e7df1, #06b6d4);
-  box-shadow: 0 3px 12px rgba(123, 97, 255, 0.3);
+  background: linear-gradient(135deg, var(--tv-accent), #06b6d4);
+  box-shadow: 0 3px 12px rgb(from var(--tv-accent) r g b / 0.3);
 }
 /* command chip — fixed dark in both themes */
 .hs-cmd {
@@ -369,7 +369,7 @@ a {
   cursor: pointer;
 }
 .hs-open:hover {
-  background: rgba(142, 125, 241, 0.14);
+  background: rgb(from var(--tv-accent) r g b / 0.14);
 }
 .hs-uninstall {
   transition: background 0.15s, border-color 0.15s, color 0.15s;
@@ -671,7 +671,7 @@ a {
   transition: background 0.15s;
 }
 .hc-resize:hover {
-  background: rgba(142, 125, 241, 0.35);
+  background: rgb(from var(--tv-accent) r g b / 0.35);
 }
 
 /* Right media dock (video / in-app browser). */

@@ -15,7 +15,15 @@ const noDrag = { WebkitAppRegion: 'no-drag' } as React.CSSProperties;
 // Leaves room for the native traffic lights (positioned at x≈16 in main.ts).
 const LIGHTS_W = 82;
 
-function AppZone({ active, onClick }: { active: boolean; onClick: () => void }) {
+// #rrggbb → rgba() with alpha. The chrome lives outside the theme-remount
+// boundary, so it's fed the literal accent value (not a CSS var) to update live.
+function hexA(hex: string, a: number): string {
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.replace(/./g, '$&$&') : h, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
+
+function AppZone({ active, accent, onClick }: { active: boolean; accent: string; onClick: () => void }) {
   return (
     <div
       onClick={onClick}
@@ -25,11 +33,10 @@ function AppZone({ active, onClick }: { active: boolean; onClick: () => void }) 
         alignSelf: 'stretch', display: 'flex', alignItems: 'center', gap: 9,
         paddingLeft: LIGHTS_W, paddingRight: 16, cursor: 'pointer',
         borderRadius: '0 12px 12px 0',
-        // backgroundColor longhand (not the `background` shorthand) so it
-        // re-resolves on a live theme swap; accentSoft is a fixed tint, not a
-        // CSS var (there is no --tv-accentSoft).
-        backgroundColor: active ? C.accentSoft : 'transparent',
-        boxShadow: active ? `inset 0 -2.5px 0 ${C.accent}` : 'none',
+        // Literal accent (from the store) so the Trove tab's accent treatment
+        // follows the chosen accent live, even though the chrome doesn't remount.
+        backgroundColor: active ? hexA(accent, 0.14) : 'transparent',
+        boxShadow: active ? `inset 0 -2.5px 0 ${accent}` : 'none',
         borderRight: `1px solid ${C.line2}`,
       }}
     >
@@ -91,6 +98,7 @@ export function BrowserChrome() {
   const activateTab = useTroveStore((s) => s.activateTab);
   const closeTab = useTroveStore((s) => s.closeTab);
   const openTab = useTroveStore((s) => s.openTab);
+  const accent = useTroveStore((s) => s.settings.accent);
   const { onHome } = useNavActions();
 
   // Clicking the brand returns to the Trove tab; if already there, it goes home.
@@ -109,7 +117,7 @@ export function BrowserChrome() {
         borderBottom: `1px solid ${C.line2}`, paddingRight: 10,
       }}
     >
-      <AppZone active={activeTabId === null} onClick={onAppZone} />
+      <AppZone active={activeTabId === null} accent={accent} onClick={onAppZone} />
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, paddingLeft: 8, paddingBottom: 0, height: '100%', flex: 1, overflow: 'hidden' }}>
         {tabs.map((t) => (
           <WebTab

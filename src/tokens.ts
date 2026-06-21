@@ -16,7 +16,9 @@ export const C = {
   line: 'var(--tv-line)',
   line2: 'var(--tv-line2)',
   accent: 'var(--tv-accent)',
-  accentSoft: 'rgba(142,125,241,.14)',
+  // Derived from the live accent (relative-color syntax) so chips/tiles follow
+  // the chosen accent instead of being stuck on the default purple.
+  accentSoft: 'rgb(from var(--tv-accent) r g b / 0.14)',
   green: '#3FB950',
   amber: '#E3B341',
   blue: '#58A6FF',

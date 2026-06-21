@@ -60,7 +60,7 @@ export function Top() {
         </div>
         <h1 style={{ margin: 0, fontSize: 34, fontWeight: 800, letterSpacing: -1.2, lineHeight: 1.05, color: C.ink }}>Top repositories</h1>
         <p style={{ margin: '9px 0 20px', fontSize: 15, color: C.sub, fontWeight: 500 }}>The most-starred and fastest-rising projects, ranked live.</p>
-        <div style={{ height: 2, maxWidth: 340, borderRadius: 2, margin: '20px 0 22px', background: 'linear-gradient(90deg,#8e7df1,#06b6d4 60%,transparent)' }} />
+        <div style={{ height: 2, maxWidth: 340, borderRadius: 2, margin: '20px 0 22px', background: 'linear-gradient(90deg,var(--tv-accent),#06b6d4 60%,transparent)' }} />
 
         {/* time-window segmented control */}
         <div className="tv-seg">

@@ -188,7 +188,7 @@ export function Shelf({
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 8, flexShrink: 0,
               ...(lead
-                ? { background: 'linear-gradient(135deg,#8e7df1,#06b6d4)', color: '#fff', boxShadow: '0 4px 14px rgba(123,97,255,.32)', '--ic2': 'rgba(255,255,255,.78)' }
+                ? { background: 'linear-gradient(135deg,var(--tv-accent),#06b6d4)', color: '#fff', boxShadow: '0 4px 14px rgb(from var(--tv-accent) r g b / .32)', '--ic2': 'rgba(255,255,255,.78)' }
                 : { background: C.accentSoft, color: C.accent, '--ic2': '#06b6d4' }),
             } as React.CSSProperties}
           >
