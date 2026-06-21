@@ -1,13 +1,17 @@
 // Renders a repo's real README markdown faithfully (GFM tables, lists, code,
-// links, images). Safe by default: react-markdown does not render raw HTML, so
-// there's no XSS path into the Electron bridges. Relative links/images are
-// resolved against the repo so they actually load; code blocks get a working
-// copy button; external links open in the OS browser.
+// links, images) — including the inline HTML many READMEs use (centered logos,
+// badge rows, <picture> dark/light logos). That HTML is parsed by rehype-raw
+// and then run through rehype-sanitize, which strips scripts, on* handlers and
+// javascript: URLs — so there's no XSS path into the Electron shell bridges.
+// Relative links/images are resolved against the repo so they actually load;
+// code blocks get a working copy button; links route smartly (see the `a` below).
 
 import { createElement, useMemo, useState, isValidElement, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import { C, mono, TABBAR_H } from '../tokens';
 import { githubRoute, openExternal } from '../lib/external';
 import { collectYouTubeRefs, youtubeRef } from '../lib/youtube';
@@ -31,6 +35,21 @@ function slugify(s: string): string {
     .replace(/[^\w\- ]+/g, '')
     .replace(/\s+/g, '-');
 }
+
+// Sanitize schema for the raw HTML many READMEs use (centered logos, badge
+// rows, <picture> dark/light logos). Extends rehype-sanitize's GitHub-based
+// default — which already strips <script>, on* handlers and javascript: URLs —
+// to also permit <picture>/<source> and presentational align/size attributes.
+const sanitizeSchema = {
+  ...defaultSchema,
+  tagNames: [...(defaultSchema.tagNames ?? []), 'picture', 'source'],
+  attributes: {
+    ...defaultSchema.attributes,
+    '*': [...(defaultSchema.attributes?.['*'] ?? []), 'align'],
+    img: [...(defaultSchema.attributes?.img ?? []), 'align', 'width', 'height'],
+    source: ['srcSet', 'srcset', 'media', 'type', 'sizes', 'width', 'height'],
+  },
+};
 
 // Give headings ids so README anchor/TOC links have something to jump to.
 const heading = (level: number) =>
@@ -147,7 +166,15 @@ export function Markdown({ md, owner, repo, branch }: { md: string; owner: strin
 
   return (
     <div className="md">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={makeUrlTransform(owner, repo, branch)} components={components}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        // rehype-raw parses the README's inline HTML; rehype-sanitize then
+        // strips anything unsafe (scripts, event handlers, javascript: URLs) so
+        // it can't reach the shell bridges. Order matters: raw → sanitize.
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema]]}
+        urlTransform={makeUrlTransform(owner, repo, branch)}
+        components={components}
+      >
         {md}
       </ReactMarkdown>
     </div>
