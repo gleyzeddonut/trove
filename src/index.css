@@ -251,6 +251,13 @@ a {
 .hs-seeall:hover {
   opacity: 0.65;
 }
+/* clickable shelf header → opens the category's full list */
+.hs-shelfhead {
+  transition: opacity 0.12s;
+}
+.hs-shelfhead:hover {
+  opacity: 0.78;
+}
 /* shelf header hover tooltip (description) */
 .hs-tip::after {
   content: attr(data-tip);

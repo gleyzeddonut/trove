@@ -220,7 +220,16 @@ export function Shelf({
     <section style={{ display: hide ? 'none' : 'block', marginTop: 30 }}>
       {/* header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 13 }}>
-        <span className="hs-tip" data-tip={shelf.description} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, cursor: 'default' }}>
+        <span
+          className="hs-tip hs-shelfhead"
+          data-tip={shelf.description}
+          role="link"
+          tabIndex={0}
+          aria-label={`See all ${shelf.title}`}
+          onClick={() => onSeeAll(shelf)}
+          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onSeeAll(shelf))}
+          style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+        >
           <span
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 8, flexShrink: 0,
