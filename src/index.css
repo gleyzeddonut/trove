@@ -82,6 +82,29 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Themed app scrollbars — the OS default (white track) clashes with the dark
+   UI, and "Show scroll bars: Always" (common with a mouse) makes it constant.
+   Transparent track + a subtle inset thumb. The console + webview keep their
+   own scrollbar styles (more specific rules below). */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--tv-line);
+  border-radius: 9px;
+  border: 3px solid var(--tv-bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--tv-hair);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 button {
   font: inherit;
 }
