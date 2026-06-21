@@ -6,7 +6,7 @@
 // Relative links/images are resolved against the repo so they actually load;
 // code blocks get a working copy button; links route smartly (see the `a` below).
 
-import { createElement, useMemo, useState, isValidElement, type ReactNode } from 'react';
+import { createElement, useMemo, useState, isValidElement, type ComponentPropsWithoutRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -51,10 +51,13 @@ const sanitizeSchema = {
   },
 };
 
-// Give headings ids so README anchor/TOC links have something to jump to.
+// Give headings ids so README anchor/TOC links have something to jump to —
+// while forwarding the element's other props (e.g. align="center" on a logo
+// heading) so centering etc. survives. `node` is react-markdown-internal; drop it.
 const heading = (level: number) =>
-  function H({ children }: { children?: ReactNode }) {
-    return createElement(`h${level}`, { id: slugify(textOf(children)) }, children);
+  function H({ node, children, ...rest }: ComponentPropsWithoutRef<'h2'> & { node?: unknown }) {
+    void node;
+    return createElement(`h${level}`, { ...rest, id: slugify(textOf(children)) }, children);
   };
 
 function makeUrlTransform(owner: string, repo: string, branch: string) {
