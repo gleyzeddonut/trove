@@ -228,7 +228,7 @@ export function Shelf({
           aria-label={`See all ${shelf.title}`}
           onClick={() => onSeeAll(shelf)}
           onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onSeeAll(shelf))}
-          style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+          style={{ position: 'relative', zIndex: 5, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
         >
           <span
             style={{
