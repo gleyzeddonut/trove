@@ -203,9 +203,9 @@ export function MediaDock() {
             key: video.id || video.list,
             src,
             // YouTube's embed rejects loads with no valid embedding referrer
-            // (Error 153) — the app's file:// / top-level context has none. Give
-            // it one explicitly so the player configures and plays.
-            httpreferrer: 'https://www.youtube.com/',
+            // (Error 153), but a youtube.com referrer reads as a self-embed
+            // (Error 152). Present a normal third-party site as the embedder.
+            httpreferrer: 'https://gleyzeddonut.github.io/',
             partition: 'persist:trove-browser',
             style: { position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 },
           })}
