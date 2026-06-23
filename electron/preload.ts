@@ -95,7 +95,25 @@ const browser = {
 
 contextBridge.exposeInMainWorld('troveBrowser', browser);
 
+// Find-in-page bridge (⌘F) — native findInPage + result counts.
+const find = {
+  query(opts: { text: string; forward?: boolean; findNext?: boolean }) {
+    ipcRenderer.send('find:query', opts);
+  },
+  stop() {
+    ipcRenderer.send('find:stop');
+  },
+  onResult(cb: (r: { matches: number; active: number }) => void) {
+    const listener = (_e: IpcRendererEvent, r: { matches: number; active: number }) => cb(r);
+    ipcRenderer.on('find:result', listener);
+    return () => ipcRenderer.removeListener('find:result', listener);
+  },
+};
+
+contextBridge.exposeInMainWorld('troveFind', find);
+
 export type TroveTerminalApi = typeof api;
 export type TroveUpdaterApi = typeof updater;
 export type TroveYouTubeApi = typeof youtube;
 export type TroveBrowserApi = typeof browser;
+export type TroveFindApi = typeof find;

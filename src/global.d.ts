@@ -43,6 +43,12 @@ export interface TroveBrowserApi {
   onNewTab(cb: (url: string) => void): () => void;
 }
 
+export interface TroveFindApi {
+  query(opts: { text: string; forward?: boolean; findNext?: boolean }): void;
+  stop(): void;
+  onResult(cb: (r: { matches: number; active: number }) => void): () => void;
+}
+
 declare global {
   interface Window {
     troveTerminal?: TroveTerminalApi;
@@ -50,6 +56,7 @@ declare global {
     troveUpdater?: TroveUpdaterApi;
     troveYouTube?: TroveYouTubeApi;
     troveBrowser?: TroveBrowserApi;
+    troveFind?: TroveFindApi;
     /** Dismiss the boot splash (defined inline in index.html). */
     __troveBootReady?: () => void;
   }

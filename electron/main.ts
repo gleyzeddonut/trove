@@ -2,7 +2,7 @@
 // the embedded terminal in the renderer talks to over IPC. Clicking "run" in
 // the UI ends up here as a real command written into that shell.
 
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, Menu, clipboard } from 'electron';
 import path from 'node:path';
 import os from 'node:os';
 import * as pty from 'node-pty';
@@ -132,6 +132,31 @@ function createWindow() {
     webPreferences.autoplayPolicy = 'no-user-gesture-required';
   });
 
+  // Relay find-in-page results to the renderer's find bar.
+  win.webContents.on('found-in-page', (_e, result) => {
+    safeSend(win, 'find:result', { matches: result.matches, active: result.activeMatchOrdinal });
+  });
+
+  // Native right-click menu. Links get Copy / Open in new tab; selected text or
+  // editable fields get the standard clipboard actions.
+  win.webContents.on('context-menu', (_e, params) => {
+    const target = win;
+    if (!target || target.isDestroyed()) return;
+    let template: Electron.MenuItemConstructorOptions[] = [];
+    if (params.linkURL) {
+      template = [
+        { label: 'Open Link in New Tab', click: () => safeSend(target, 'browser:new-tab', params.linkURL) },
+        { label: 'Open Link in Browser', click: () => shell.openExternal(params.linkURL) },
+        { label: 'Copy Link', click: () => clipboard.writeText(params.linkURL) },
+      ];
+    } else if (params.isEditable) {
+      template = [{ role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { type: 'separator' }, { role: 'selectAll' }];
+    } else if (params.selectionText) {
+      template = [{ role: 'copy' }];
+    }
+    if (template.length) Menu.buildFromTemplate(template).popup({ window: target });
+  });
+
   startPty();
 
   if (DEV_URL) {
@@ -200,6 +225,16 @@ ipcMain.on('terminal:popin', () => {
 
 ipcMain.handle('app:version', () => app.getVersion());
 
+// --- Find in page (⌘F) ----------------------------------------------------
+ipcMain.on('find:query', (_e, opts: { text: string; forward?: boolean; findNext?: boolean }) => {
+  if (opts.text && win && !win.isDestroyed()) {
+    win.webContents.findInPage(opts.text, { forward: opts.forward ?? true, findNext: opts.findNext ?? false });
+  }
+});
+ipcMain.on('find:stop', () => {
+  if (win && !win.isDestroyed()) win.webContents.stopFindInPage('clearSelection');
+});
+
 // YouTube oEmbed (no CORS in the main process) — title + channel for the dock's
 // video meta + "Up next" queue. Returns null on any failure.
 ipcMain.handle('youtube:meta', async (_e, watchUrl: string) => {
@@ -242,6 +277,23 @@ app.on('web-contents-created', (_e, contents) => {
       if (host && !host.isDestroyed()) host.send('browser:new-tab', url);
       else shell.openExternal(url);
       return { action: 'deny' };
+    });
+    // Same right-click menu inside browser tabs.
+    contents.on('context-menu', (_ev, params) => {
+      const host = contents.hostWebContents;
+      let template: Electron.MenuItemConstructorOptions[] = [];
+      if (params.linkURL) {
+        template = [
+          { label: 'Open Link in New Tab', click: () => host && !host.isDestroyed() && host.send('browser:new-tab', params.linkURL) },
+          { label: 'Open Link in Browser', click: () => shell.openExternal(params.linkURL) },
+          { label: 'Copy Link', click: () => clipboard.writeText(params.linkURL) },
+        ];
+      } else if (params.isEditable) {
+        template = [{ role: 'cut' }, { role: 'copy' }, { role: 'paste' }];
+      } else if (params.selectionText) {
+        template = [{ role: 'copy' }];
+      }
+      if (template.length && win && !win.isDestroyed()) Menu.buildFromTemplate(template).popup({ window: win });
     });
   }
 });

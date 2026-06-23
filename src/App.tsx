@@ -1,7 +1,7 @@
 // App shell: routes + the persistent console dock. Page content gets bottom
 // padding equal to the visible dock height so nothing is hidden behind it.
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { CONSOLE_COLLAPSED_H, TABBAR_H } from './tokens';
 import { Storefront } from './pages/Storefront';
@@ -15,6 +15,7 @@ import { Console } from './components/console/Console';
 import { MediaDock } from './components/MediaDock';
 import { BrowserChrome } from './components/browser/BrowserChrome';
 import { WebTabView } from './components/browser/WebTabView';
+import { FindBar } from './components/FindBar';
 import { useTroveStore } from './store/useTroveStore';
 import { applyTheme } from './lib/settings';
 import { fetchRegistrySize } from './data/github';
@@ -30,6 +31,7 @@ export default function App() {
   const dockWidth = useTroveStore((s) => s.dockWidth);
   const tabs = useTroveStore((s) => s.tabs);
   const activeTabId = useTroveStore((s) => s.activeTabId);
+  const [findOpen, setFindOpen] = useState(false);
   const { pathname } = useLocation();
   const navigate = useNavigate();
 
@@ -110,6 +112,14 @@ export default function App() {
       return !!a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA');
     };
     const onKey = (e: KeyboardEvent) => {
+      // ⌘F → find on page (native findInPage, only in the desktop app — a plain
+      // browser keeps its own Find). Works regardless of focus.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f' && window.troveFind && useTroveStore.getState().activeTabId === null) {
+        e.preventDefault();
+        setFindOpen(true);
+        requestAnimationFrame(() => document.getElementById('trove-find')?.focus());
+        return;
+      }
       // A web tab is its own context — don't let these drive the hidden app.
       if (useTroveStore.getState().activeTabId !== null) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
@@ -134,6 +144,11 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [setConsoleOpen, toggleConsole, navigate]);
+
+  // Close the find bar when switching to a web tab (its content is hidden).
+  useEffect(() => {
+    if (activeTabId !== null && findOpen) setFindOpen(false);
+  }, [activeTabId, findOpen]);
 
   // The popped-out window renders only the terminal — no chrome, nav, or dock.
   if (pathname === '/__terminal') return <TerminalWindow />;
@@ -179,6 +194,8 @@ export default function App() {
       {tabs.map((t) => (
         <WebTabView key={t.id} tab={t} active={t.id === activeTabId} />
       ))}
+
+      {findOpen && <FindBar onClose={() => setFindOpen(false)} />}
     </>
   );
 }
