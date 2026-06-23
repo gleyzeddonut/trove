@@ -20,6 +20,17 @@ const WINDOWS: { id: Win; label: string }[] = [
   { id: 'all', label: 'All time' },
 ];
 
+// Remember the chosen time window across visits / launches.
+const LS_WIN = 'trove.topWindow.v1';
+function loadWin(): Win {
+  try {
+    const v = localStorage.getItem(LS_WIN) as Win | null;
+    return v && WINDOWS.some((w) => w.id === v) ? v : 'week';
+  } catch {
+    return 'week';
+  }
+}
+
 // Time window → GitHub `q`. "All time" is the classic top list (the giants);
 // the others rank repos *created* in the window (new-and-rising), sorted by stars.
 function windowQuery(w: Win): string {
@@ -29,13 +40,21 @@ function windowQuery(w: Win): string {
   return `created:>=${since}`;
 }
 
-// Warm the default Top view (this week) so switching to the tab is instant.
+// Warm the last-used Top view so switching to the tab is instant.
 export function prefetchTop(): void {
-  void prefetchSearch(windowQuery('week'), 'stars');
+  void prefetchSearch(windowQuery(loadWin()), 'stars');
 }
 
 export function Top() {
-  const [win, setWin] = useState<Win>('week');
+  const [win, setWin] = useState<Win>(loadWin);
+  const pickWin = (w: Win) => {
+    setWin(w);
+    try {
+      localStorage.setItem(LS_WIN, w);
+    } catch {
+      /* ignore */
+    }
+  };
   const installed = useTroveStore((s) => s.installed);
   const install = useTroveStore((s) => s.install);
   const open = useTroveStore((s) => s.open);
@@ -65,7 +84,7 @@ export function Top() {
         {/* time-window segmented control */}
         <div className="tv-seg">
           {WINDOWS.map((w) => (
-            <button key={w.id} className={w.id === win ? 'on' : undefined} onClick={() => setWin(w.id)}>
+            <button key={w.id} className={w.id === win ? 'on' : undefined} onClick={() => pickWin(w.id)}>
               {w.label}
             </button>
           ))}
