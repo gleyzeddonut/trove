@@ -128,6 +128,8 @@ function createWindow() {
     delete webPreferences.preload;
     webPreferences.nodeIntegration = false;
     webPreferences.contextIsolation = true;
+    // Let the docked YouTube player autoplay (no user-gesture requirement).
+    webPreferences.autoplayPolicy = 'no-user-gesture-required';
   });
 
   startPty();

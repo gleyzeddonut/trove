@@ -1,8 +1,20 @@
+import { useTroveStore } from '../store/useTroveStore';
+
 // Open a URL in the OS browser. In Electron, window.open is intercepted by the
 // main process's setWindowOpenHandler and routed to shell.openExternal; in a
 // plain browser it just opens a new tab.
 export function openExternal(url: string) {
   window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+// Open a URL in the in-app browser (a new tab) when running in the desktop app,
+// else fall back to the OS browser.
+export function openInApp(url: string) {
+  if (typeof window !== 'undefined' && window.troveTerminal) {
+    useTroveStore.getState().openTab(url);
+  } else {
+    openExternal(url);
+  }
 }
 
 // Top-level github.com paths that are site features, not user/org profiles.

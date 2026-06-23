@@ -8,7 +8,7 @@ import { Nav } from '../components/Nav';
 import {
   BackArrow, Check, Clock, ExternalLink, FileIcon, Fork, GitHubMark, IssueDot, License, Play, Star, Watch,
 } from '../components/icons';
-import { openExternal } from '../lib/external';
+import { openInApp } from '../lib/external';
 import { Markdown } from '../components/Markdown';
 import { useGithubRepo } from '../lib/useGithub';
 import { useTroveStore } from '../store/useTroveStore';
@@ -100,7 +100,7 @@ export function Detail() {
           <div style={{ flex: 1 }} />
           <button
             className="hd-btn"
-            onClick={() => openExternal(p.htmlUrl)}
+            onClick={() => openInApp(p.htmlUrl)}
             title="Open the repository on github.com"
             style={{ display: 'flex', alignItems: 'center', gap: 7, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 9, padding: '7px 12px', fontFamily: sans, fontSize: 13, fontWeight: 600, color: C.sub, cursor: 'pointer' }}
           >

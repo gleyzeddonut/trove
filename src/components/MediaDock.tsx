@@ -1,13 +1,14 @@
-// The right-docked video player. A cross-origin youtube-nocookie embed on a
-// dark 16:9 stage, with an "Up next" queue built from every YouTube link on the
-// README you're reading (titles/channels via keyless oEmbed, thumbnails direct
-// from i.ytimg.com); a playlist link plays as a native YT playlist inside the
-// embed. Adopts the "Demos" dock look from the handoff: a resizable panel
-// pinned below the chrome + nav, with a draggable left edge. The iframe is
-// cross-origin, so it can't reach the app's shell bridges. (Other external
-// links open as browser tabs in the chrome, not here.)
+// The right-docked video player. A YouTube embed on a dark 16:9 stage, with an
+// "Up next" queue built from every YouTube link on the README you're reading
+// (titles/channels via keyless oEmbed, thumbnails direct from i.ytimg.com); a
+// playlist link plays as a native YT playlist. Adopts the "Demos" dock look
+// from the handoff: a resizable panel pinned below the chrome + nav, with a
+// draggable left edge. The player is a <webview> (not an <iframe>) so it loads
+// top-level with a real https origin — an embedded iframe gets the packaged
+// app's file:// origin, which YouTube rejects. The webview has no preload, so
+// it can't reach the shell bridges. (Other external links open as browser tabs.)
 
-import { useEffect, useState } from 'react';
+import { createElement, useEffect, useState } from 'react';
 import { C, sans, mono, TABBAR_H } from '../tokens';
 import { openExternal } from '../lib/external';
 import {
@@ -158,7 +159,7 @@ export function MediaDock() {
   const params = new URLSearchParams({ autoplay: '1', rel: '0' });
   if (video.list) params.set('list', video.list);
   if (video.start) params.set('start', String(video.start));
-  const src = `https://www.youtube-nocookie.com/embed/${video.id || 'videoseries'}?${params.toString()}`;
+  const src = `https://www.youtube.com/embed/${video.id || 'videoseries'}?${params.toString()}`;
   const activeMeta = meta[refKey(video)];
   const externalUrl = watchUrl(video);
   const title = videoQueue.length > 1 ? `Video · ${videoQueue.length} in queue` : 'Video';
@@ -194,16 +195,16 @@ export function MediaDock() {
       </div>
 
       <div className="hv-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-        {/* dark 16:9 stage */}
+        {/* dark 16:9 stage — a <webview> (not an <iframe>) so the player loads
+            top-level with a real https origin; an embedded iframe gets the app's
+            file:// origin in the packaged build, which YouTube rejects (err 153). */}
         <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', background: '#06070A' }}>
-          <iframe
-            key={video.id || video.list}
-            src={src}
-            title="YouTube video"
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
-            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-            referrerPolicy="strict-origin-when-cross-origin"
-          />
+          {createElement('webview', {
+            key: video.id || video.list,
+            src,
+            partition: 'persist:trove-browser',
+            style: { position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 },
+          })}
         </div>
 
         {/* meta */}

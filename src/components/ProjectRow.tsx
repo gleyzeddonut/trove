@@ -8,7 +8,7 @@ import { C, mono, sans } from '../tokens';
 import { Caret, Check, ExternalLink, Fork, GitHubMark, Star, Trash } from './icons';
 import { CommandChip } from './CommandChip';
 import { k } from '../lib/derive';
-import { openExternal } from '../lib/external';
+import { openInApp } from '../lib/external';
 import type { Project } from '../types';
 
 interface Props {
@@ -153,7 +153,7 @@ export function ProjectRow({ p, installed, rank, onOpenDetail, onInstall, onOpen
               <span>updated {p.updated}</span>
               <div style={{ flex: 1 }} />
               <button
-                onClick={(e) => { e.stopPropagation(); openExternal(p.htmlUrl); }}
+                onClick={(e) => { e.stopPropagation(); openInApp(p.htmlUrl); }}
                 title="Open on github.com"
                 style={{ display: 'flex', alignItems: 'center', gap: 5, border: 'none', background: 'transparent', color: C.sub, fontFamily: sans, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: 0 }}
               >
