@@ -223,6 +223,40 @@ ipcMain.on('terminal:popin', () => {
   if (popoutWin && !popoutWin.isDestroyed()) popoutWin.close();
 });
 
+// --- Video pop-out: detach the player into its own floating window ---------
+let videoWin: BrowserWindow | null = null;
+ipcMain.on('video:popout', (_e, url: string) => {
+  if (!url) return;
+  const opts = { httpReferrer: 'https://gleyzeddonut.github.io/' };
+  if (videoWin && !videoWin.isDestroyed()) {
+    videoWin.loadURL(url, opts);
+    videoWin.focus();
+    return;
+  }
+  videoWin = new BrowserWindow({
+    width: 480,
+    height: 300,
+    minWidth: 280,
+    minHeight: 170,
+    title: 'Trove — Video',
+    backgroundColor: '#000000',
+    alwaysOnTop: true,
+    // No preload: this window navigates to YouTube directly, so it must not see
+    // the app's shell bridges.
+    webPreferences: { contextIsolation: true, nodeIntegration: false, autoplayPolicy: 'no-user-gesture-required' },
+  });
+  videoWin.setMenuBarVisibility(false);
+  videoWin.setAspectRatio(16 / 9);
+  videoWin.webContents.setWindowOpenHandler(({ url: u }) => {
+    shell.openExternal(u);
+    return { action: 'deny' };
+  });
+  videoWin.loadURL(url, opts);
+  videoWin.on('closed', () => {
+    videoWin = null;
+  });
+});
+
 ipcMain.handle('app:version', () => app.getVersion());
 
 // --- Find in page (⌘F) ----------------------------------------------------

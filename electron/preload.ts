@@ -112,7 +112,17 @@ const find = {
 
 contextBridge.exposeInMainWorld('troveFind', find);
 
+// Pop the video out into its own floating window.
+const videoWindow = {
+  popOut(url: string) {
+    ipcRenderer.send('video:popout', url);
+  },
+};
+
+contextBridge.exposeInMainWorld('troveVideo', videoWindow);
+
 export type TroveTerminalApi = typeof api;
+export type TroveVideoApi = typeof videoWindow;
 export type TroveUpdaterApi = typeof updater;
 export type TroveYouTubeApi = typeof youtube;
 export type TroveBrowserApi = typeof browser;

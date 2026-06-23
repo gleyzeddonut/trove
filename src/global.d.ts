@@ -49,6 +49,10 @@ export interface TroveFindApi {
   onResult(cb: (r: { matches: number; active: number }) => void): () => void;
 }
 
+export interface TroveVideoApi {
+  popOut(url: string): void;
+}
+
 declare global {
   interface Window {
     troveTerminal?: TroveTerminalApi;
@@ -57,6 +61,7 @@ declare global {
     troveYouTube?: TroveYouTubeApi;
     troveBrowser?: TroveBrowserApi;
     troveFind?: TroveFindApi;
+    troveVideo?: TroveVideoApi;
     /** Dismiss the boot splash (defined inline in index.html). */
     __troveBootReady?: () => void;
   }

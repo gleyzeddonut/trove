@@ -186,9 +186,17 @@ export function MediaDock() {
         <span style={{ fontFamily: sans, fontWeight: 700, fontSize: 13.5, color: C.ink, letterSpacing: -0.2, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {title}
         </span>
-        <HeaderBtn title="Open on YouTube" onClick={() => openExternal(externalUrl)}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3h7v7M21 3l-9 9M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" /></svg>
-        </HeaderBtn>
+        {window.troveVideo && (
+          <HeaderBtn
+            title="Pop out into its own window"
+            onClick={() => {
+              window.troveVideo?.popOut(src);
+              close();
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1.5" y="4" width="9" height="8" rx="1.5" /><path d="M11 7h3.5v7.5H6.5V11" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </HeaderBtn>
+        )}
         <HeaderBtn title="Close" onClick={close}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M4 4l8 8M12 4l-8 8" /></svg>
         </HeaderBtn>
