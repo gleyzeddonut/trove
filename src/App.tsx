@@ -18,7 +18,7 @@ import { WebTabView } from './components/browser/WebTabView';
 import { FindBar } from './components/FindBar';
 import { useTroveStore } from './store/useTroveStore';
 import { applyTheme } from './lib/settings';
-import { fetchRegistrySize } from './data/github';
+import { fetchRegistrySize, registrySizeIsFresh } from './data/github';
 
 export default function App() {
   const consoleOpen = useTroveStore((s) => s.consoleOpen);
@@ -41,14 +41,26 @@ export default function App() {
     applyTheme(useTroveStore.getState().settings);
     useTroveStore.getState().hydrateAccount();
 
-    // Refresh the real registry size for the next launch's boot splash.
-    fetchRegistrySize()
-      .then((n) => {
-        if (n > 0) localStorage.setItem('trove.registrySize', String(n));
-      })
-      .catch(() => {
-        /* offline / rate-limited — keep last value */
-      });
+    // Refresh the real registry size for the next launch's boot splash — at
+    // most once a day, so a cold boot doesn't spend a search call on it.
+    let fetchedAt: number | null = null;
+    try {
+      fetchedAt = parseInt(localStorage.getItem('trove.registrySize.ts') || '', 10);
+    } catch {
+      /* ignore */
+    }
+    if (!registrySizeIsFresh(fetchedAt, Date.now())) {
+      fetchRegistrySize()
+        .then((n) => {
+          if (n > 0) {
+            localStorage.setItem('trove.registrySize', String(n));
+            localStorage.setItem('trove.registrySize.ts', String(Date.now()));
+          }
+        })
+        .catch(() => {
+          /* offline / rate-limited — keep last value */
+        });
+    }
 
     // Warm the Top page in the background (after Discover's shelves load) so
     // switching to it is instant. Throttled with the shelf searches anyway.

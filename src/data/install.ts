@@ -123,7 +123,11 @@ export function dirFromCloneUrl(url: string): string {
 // scp-style `git@host:owner/repo`. Anything else (a shell-metachar payload,
 // a `file://`, an option like `--upload-pack=…`) is rejected so we never
 // interpolate an attacker-controlled token into the shell.
-const SAFE_CLONE_URL = /^(https?:\/\/[^\s'"`;|&$()<>\\]+|git@[^\s:'"`;|&$()<>\\]+:[^\s'"`;|&$()<>\\]+)$/;
+// Allowlist (not a denylist): the URL-safe set plus `:` `/` `?` `#` `@` `%`.
+// This keeps out everything an interactive zsh would act on — `!` (history),
+// `{}` (brace expansion), `*` `[]` (globs), quotes, and all the chaining chars.
+const URL_CHARS = 'A-Za-z0-9._~:/?#@%+=,-';
+const SAFE_CLONE_URL = new RegExp(`^(https?://[${URL_CHARS}]+|git@[${URL_CHARS}]+)$`);
 // A shell-safe directory name: no separators or metacharacters.
 const SAFE_DIR = /^[A-Za-z0-9._-]+$/;
 
@@ -161,7 +165,11 @@ export function isRiskyCommand(cmd: string): boolean {
  * - `steps` are the build commands with any `git clone` and the "enter the repo"
  *   `cd <dir>` removed, since we handle both. The caller runs `cd <dir> && steps`.
  */
-export function planInstallCommands(setup: string[], fallbackUrl: string, name: string): InstallCommands {
+export function planInstallCommands(rawSetup: string[], fallbackUrl: string, name: string): InstallCommands {
+  // READMEs often chain one line (`git clone X && cd X && make`). Split so the
+  // clone / enter-cd can be stripped without taking the build step with them;
+  // the caller re-joins the steps with `&&` anyway.
+  const setup = rawSetup.flatMap((c) => c.split(/\s*&&\s*/)).map((c) => c.trim()).filter(Boolean);
   const cloneLine = setup.find((c) => /^\s*git\s+clone\b/.test(c));
   const lineUrl = (cloneLine?.match(/git\s+clone\s+(?:-\S+\s+)*(\S+)/)?.[1] || '').trim();
   // Prefer the README's clone URL, but only if it's a safe git remote; otherwise

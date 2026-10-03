@@ -447,7 +447,14 @@ export async function searchRepos(query: string, page = 1, sort: DiscoverSort = 
 
 // Real count of indexed public repos (everything with at least one star), for
 // the boot splash. Persisted by the caller so the splash can read last
-// session's value before the bundle loads.
+// session's value before the bundle loads. It changes slowly, and each fetch
+// is a search call out of the unauthenticated 10/min budget the shelves also
+// draw on — so the caller refreshes it at most once a day.
+export const REGISTRY_SIZE_TTL_MS = 24 * 60 * 60 * 1000;
+export function registrySizeIsFresh(fetchedAt: number | null, now: number): boolean {
+  return fetchedAt != null && Number.isFinite(fetchedAt) && now - fetchedAt < REGISTRY_SIZE_TTL_MS;
+}
+
 export async function fetchRegistrySize(): Promise<number> {
   const data = await withSearchSlot(() =>
     ghJson<{ total_count: number }>('/search/repositories?q=stars:>0&per_page=1'),
@@ -638,6 +645,15 @@ function mapUserLite(u: { login: string; avatar_url: string; type?: string }): C
     cover: coverFor(u.login).cover,
     publicRepos: 0,
   };
+}
+
+/** Is a search-box query worth spending a (rate-limited) user search on?
+ *  Not for GitHub qualifiers (`topic:cli` from a shelf's "see all",
+ *  `language:rust`) — those are repo searches — and not for a single char. */
+export function isPeopleQuery(query: string): boolean {
+  const q = query.trim();
+  if (q.length < 2) return false;
+  return !/\b\w+:/.test(q);
 }
 
 /** Search GitHub users/orgs by name or handle. One API call, capped small. */

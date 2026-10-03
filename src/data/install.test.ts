@@ -187,3 +187,36 @@ describe('isRiskyCommand — one-line installs that need a loud confirm', () => 
     expect(isRiskyCommand('curl -fsSL https://x/install.sh')).toBe(true);
   });
 });
+
+describe('planInstallCommands — compound README lines', () => {
+  it('splits `git clone X && cd X && make` so the build step survives', () => {
+    const plan = planInstallCommands(['git clone https://github.com/a/b && cd b && make'], 'unused', 'b');
+    expect(plan.clone).toBe('git clone https://github.com/a/b');
+    expect(plan.dir).toBe('b');
+    expect(plan.steps).toEqual(['make']);
+  });
+  it('splits other chained lines into separate steps', () => {
+    const plan = planInstallCommands(['npm install && npm run build'], 'https://github.com/a/b.git', 'b');
+    expect(plan.steps).toEqual(['npm install', 'npm run build']);
+  });
+});
+
+describe('planInstallCommands — clone URL charset is shell-inert', () => {
+  it.each([
+    'https://github.com/a/b!x', // zsh history expansion
+    'https://github.com/a/{b,c}', // brace expansion
+    'https://github.com/a/b*', // glob
+    "https://github.com/a/b'x",
+  ])('rejects %s and falls back to the API URL', (bad) => {
+    const plan = planInstallCommands([`git clone ${bad}`, 'make'], 'https://github.com/a/b.git', 'b');
+    expect(plan.clone).toBe('git clone https://github.com/a/b.git');
+  });
+  it('refuses when the fallback itself has an active character', () => {
+    expect(planInstallCommands(['make'], 'https://github.com/a/b!x', 'b').clone).toBeNull();
+  });
+  it('still accepts ordinary URLs with query, fragment, percent-encoding and scp form', () => {
+    expect(planInstallCommands(['make'], 'https://github.com/a/b.git?ref=main#x', 'b').clone).toBe('git clone https://github.com/a/b.git?ref=main#x');
+    expect(planInstallCommands(['make'], 'https://github.com/a/my%20repo', 'r').clone).toBe('git clone https://github.com/a/my%20repo');
+    expect(planInstallCommands(['make'], 'git@github.com:a/b.git', 'b').clone).toBe('git clone git@github.com:a/b.git');
+  });
+});

@@ -9,6 +9,7 @@ import {
   fetchCreatorProfile,
   fetchFeed,
   fetchRepo,
+  isPeopleQuery,
   previewDetail,
   searchRepos,
   searchUsers,
@@ -211,9 +212,10 @@ export function useUserSearch(query: string, enabled: boolean): { people: Creato
 
   useEffect(() => {
     const q = query.trim();
-    // Require ≥2 chars — a single letter matches ~everyone and burns a search
-    // call on every keystroke (user search shares the repo-search rate budget).
-    if (!enabled || q.length < 2) {
+    // Skip single letters (match ~everyone) and qualifier queries like
+    // `topic:cli` (repo searches, not people) — each one would burn a search
+    // call from the budget the repo search shares.
+    if (!enabled || !isPeopleQuery(q)) {
       setPeople([]);
       setLoading(false);
       return;
