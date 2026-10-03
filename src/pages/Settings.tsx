@@ -1,7 +1,6 @@
-// Settings (/settings) — appearance/theme, GitHub connect, updates, install,
-// feed, notifications, privacy, danger zone. Reached via the nav avatar.
-// Theme/accent/density, open-console-on-install, feed scope, clear-library and
-// reset are wired; the rest persist as preferences.
+// Settings (/settings) — account, updates, appearance, install & terminal,
+// feed, danger zone. Reached via the nav avatar. Every control here is wired
+// to real behaviour; there are no placeholder toggles.
 
 import { useEffect, useRef, useState } from 'react';
 import { C, mono, sans, TABBAR_H } from '../tokens';
@@ -18,8 +17,6 @@ const SECTIONS: [string, string, string][] = [
   ['appearance', 'Appearance', 'M8 1.5a6.5 6.5 0 1 0 0 13c.8 0 1.2-1 .7-1.6-.6-.8-.1-1.9.9-1.9H12a2.5 2.5 0 0 0 2.5-2.5A6.5 6.5 0 0 0 8 1.5z'],
   ['install', 'Install & terminal', 'M2 3.5h12v9H2zM4.5 6.5l2 2-2 2M8.5 10.5h3'],
   ['feed', 'Feed', 'M3 3h10v3H3zM3 8h10v5H3z'],
-  ['notifications', 'Notifications', 'M8 2a4 4 0 0 0-4 4c0 3-1.2 4-1.2 4h10.4S12 9 12 6a4 4 0 0 0-4-4zM6.5 13a1.5 1.5 0 0 0 3 0'],
-  ['privacy', 'Privacy', 'M8 1.5l5 2v4c0 3.2-2.2 5.5-5 6.5-2.8-1-5-3.3-5-6.5v-4z'],
 ];
 
 const BranchGlyph = ({ s = 24, stroke = C.ink }: { s?: number; stroke?: string }) => (
@@ -227,11 +224,8 @@ export function Settings() {
                         <BranchGlyph s={13} stroke={C.green} /> GitHub
                       </span>
                     </div>
-                    <Row title="Connected account" desc={`Authenticated as @${account.login}. Trove uses your token to read GitHub at 5,000 req/hr.`}>
+                    <Row title="Connected account" desc={`Authenticated as @${account.login}. Trove uses your token to read GitHub at 5,000 req/hr.`} last>
                       <button className="set-btn" onClick={() => disconnectGithub()} style={{ fontFamily: sans, fontWeight: 600, fontSize: 12.5, color: C.sub, background: 'transparent', border: `1px solid ${C.line}`, borderRadius: 8, padding: '7px 14px' }}>Disconnect</button>
-                    </Row>
-                    <Row title="Plan" desc="Trove is free and open. Support keeps the lights on." last>
-                      <button className="set-btn" style={{ fontFamily: sans, fontWeight: 700, fontSize: 13, color: '#fff', background: C.accent, border: 'none', borderRadius: 9, padding: '8px 16px' }}>Support Trove</button>
                     </Row>
                   </>
                 ) : (
@@ -284,11 +278,8 @@ export function Settings() {
                 <Row title="Open console on install" desc="Slide the terminal up automatically when you run an install.">
                   <Toggle on={s.autoConsole} onChange={(v) => set('autoConsole', v)} />
                 </Row>
-                <Row title="Confirm before installing" desc="Ask for a confirmation before running an install command.">
+                <Row title="Confirm before installing" desc="Ask before running any install or uninstall command. Commands that chain, pipe, download or need sudo always ask." last>
                   <Toggle on={s.confirmInstall} onChange={(v) => set('confirmInstall', v)} />
-                </Row>
-                <Row title="Keep installs updated" desc="Check followed tools for new releases and offer one-click updates." last>
-                  <Toggle on={s.keepUpdated} onChange={(v) => set('keepUpdated', v)} />
                 </Row>
               </Card>
             ))}
@@ -296,44 +287,8 @@ export function Settings() {
             {/* FEED */}
             {section('feed', 'Feed', (
               <Card>
-                <Row title="Show in feed" desc="Whose activity appears on your Feed page.">
+                <Row title="Show in feed" desc="Whose activity appears on your Feed page." last>
                   <Segmented value={s.feedScope} onChange={(v) => set('feedScope', v)} options={[['following', 'Following'], ['all', 'Everyone']]} />
-                </Row>
-                <Row title="Autoplay demos" desc="Play tool demo clips automatically as you scroll.">
-                  <Toggle on={s.autoplay} onChange={(v) => set('autoplay', v)} />
-                </Row>
-                <Row title="Show replies inline" last>
-                  <Toggle on={s.showReplies} onChange={(v) => set('showReplies', v)} />
-                </Row>
-              </Card>
-            ))}
-
-            {/* NOTIFICATIONS */}
-            {section('notifications', 'Notifications', (
-              <Card>
-                <Row title="New releases" desc="When a creator you follow ships an update.">
-                  <Toggle on={s.notifReleases} onChange={(v) => set('notifReleases', v)} />
-                </Row>
-                <Row title="Replies & mentions" desc="When someone replies to or mentions you.">
-                  <Toggle on={s.notifMentions} onChange={(v) => set('notifMentions', v)} />
-                </Row>
-                <Row title="Weekly digest" desc="A Monday roundup of the best new tools." last>
-                  <Toggle on={s.notifDigest} onChange={(v) => set('notifDigest', v)} />
-                </Row>
-              </Card>
-            ))}
-
-            {/* PRIVACY */}
-            {section('privacy', 'Privacy', (
-              <Card>
-                <Row title="Usage analytics" desc="Trove ships zero telemetry by default. Opt in to help us prioritize.">
-                  <Toggle on={s.telemetry} onChange={(v) => set('telemetry', v)} />
-                </Row>
-                <Row title="Public library" desc="Let others see what you've installed on your profile.">
-                  <Toggle on={s.publicLibrary} onChange={(v) => set('publicLibrary', v)} />
-                </Row>
-                <Row title="Public follows" desc="Show who you follow on your profile." last>
-                  <Toggle on={s.publicFollows} onChange={(v) => set('publicFollows', v)} />
                 </Row>
               </Card>
             ))}

@@ -14,16 +14,7 @@ export interface TroveSettings {
   pkg: PkgChoice;
   autoConsole: boolean;
   confirmInstall: boolean;
-  keepUpdated: boolean;
   feedScope: FeedScope;
-  autoplay: boolean;
-  showReplies: boolean;
-  notifReleases: boolean;
-  notifMentions: boolean;
-  notifDigest: boolean;
-  telemetry: boolean;
-  publicLibrary: boolean;
-  publicFollows: boolean;
 }
 
 export const DEFAULT_ACCENT = '#8E7DF1';
@@ -35,26 +26,24 @@ export const SETTINGS_DEFAULTS: TroveSettings = {
   pkg: 'auto',
   autoConsole: true,
   confirmInstall: false,
-  keepUpdated: true,
   feedScope: 'following',
-  autoplay: false,
-  showReplies: true,
-  notifReleases: true,
-  notifMentions: true,
-  notifDigest: false,
-  telemetry: false,
-  publicLibrary: true,
-  publicFollows: false,
 };
 
 const LS = 'trove.settings.v1';
 
 export const loadSettings = (): TroveSettings => {
+  const out = { ...SETTINGS_DEFAULTS };
   try {
-    return { ...SETTINGS_DEFAULTS, ...(JSON.parse(localStorage.getItem(LS) || '{}') || {}) };
+    const saved = (JSON.parse(localStorage.getItem(LS) || '{}') || {}) as Record<string, unknown>;
+    // Only keys that are still settings — stale ones from removed toggles are
+    // dropped rather than carried along forever.
+    for (const k of Object.keys(SETTINGS_DEFAULTS) as (keyof TroveSettings)[]) {
+      if (k in saved) (out as Record<string, unknown>)[k] = saved[k];
+    }
   } catch {
-    return { ...SETTINGS_DEFAULTS };
+    /* corrupt / unavailable storage → defaults */
   }
+  return out;
 };
 
 export const persistSettings = (s: TroveSettings) => {
