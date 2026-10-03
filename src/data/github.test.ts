@@ -42,3 +42,13 @@ describe('registrySizeIsFresh — the boot-splash count is refreshed once a day,
     expect(registrySizeIsFresh(Number.NaN, 5)).toBe(false);
   });
 });
+
+describe('currentToken — where the GitHub token comes from', () => {
+  it('uses the session token handed over from the secure store first', async () => {
+    const { currentToken, setSessionToken } = await import('./github');
+    setSessionToken('ghp_session');
+    expect(currentToken()).toBe('ghp_session');
+    setSessionToken('');
+    expect(currentToken()).toBe('');
+  });
+});

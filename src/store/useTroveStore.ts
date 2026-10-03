@@ -6,7 +6,7 @@
 import { create } from 'zustand';
 import type { Project, TypeFilter } from '../types';
 import type { UpdateState } from '../global';
-import { fetchAuthedUser, uninstallCommandFor, type Account, type DiscoverSort } from '../data/github';
+import { currentToken, fetchAuthedUser, setSessionToken, uninstallCommandFor, type Account, type DiscoverSort } from '../data/github';
 import { isRiskyCommand, planInstallCommands } from '../data/install';
 
 /** Library list ordering (client-side, since the library is local). */
@@ -22,13 +22,54 @@ import {
 } from '../lib/settings';
 
 const LS_TOKEN = 'trove.ghtoken';
-const hasToken = (): boolean => {
+const hasToken = (): boolean => !!currentToken();
+
+/** The desktop app's encrypted token store (safeStorage), when available. */
+const secrets = () => (typeof window !== 'undefined' ? window.troveSecrets : undefined);
+const lsGet = (k: string): string => {
   try {
-    return !!localStorage.getItem(LS_TOKEN) || !!window.troveEnv?.githubToken;
+    return localStorage.getItem(k) || '';
   } catch {
-    return false;
+    return '';
   }
 };
+const lsSet = (k: string, v: string) => {
+  try {
+    localStorage.setItem(k, v);
+  } catch {
+    /* ignore */
+  }
+};
+const lsRemove = (k: string) => {
+  try {
+    localStorage.removeItem(k);
+  } catch {
+    /* ignore */
+  }
+};
+/** Persist the token: encrypted via the main process in the app, else localStorage. */
+async function storeToken(t: string): Promise<void> {
+  const s = secrets();
+  if (s) {
+    try {
+      await s.setToken(t);
+      setSessionToken(t);
+      return;
+    } catch {
+      /* encryption unavailable on this machine — fall back below */
+    }
+  }
+  lsSet(LS_TOKEN, t);
+}
+async function forgetToken(): Promise<void> {
+  setSessionToken('');
+  lsRemove(LS_TOKEN);
+  try {
+    await secrets()?.clearToken();
+  } catch {
+    /* ignore */
+  }
+}
 
 const LS_HEIGHT = 'trove.consoleHeight';
 const loadHeight = (): number => {
@@ -283,36 +324,44 @@ export const useTroveStore = create<TroveState>((set, get) => ({
   connectGithub: async (token) => {
     const t = token.trim();
     if (!t) return;
-    try {
-      localStorage.setItem(LS_TOKEN, t);
-    } catch {
-      /* ignore */
-    }
     set({ connecting: true });
+    await storeToken(t);
     try {
       const account = await fetchAuthedUser();
       set({ account, connecting: false });
     } catch {
       // bad token — roll back so the UI doesn't show a false "connected" state
-      try {
-        localStorage.removeItem(LS_TOKEN);
-      } catch {
-        /* ignore */
-      }
+      await forgetToken();
       set({ account: null, connecting: false });
       // If an env-provided token still works, restore the connected account.
       get().hydrateAccount();
     }
   },
   disconnectGithub: () => {
-    try {
-      localStorage.removeItem(LS_TOKEN);
-    } catch {
-      /* ignore */
-    }
+    void forgetToken();
     set({ account: null });
   },
   hydrateAccount: async () => {
+    // Desktop app: pull the token out of the encrypted store. A token left in
+    // localStorage by an older version is moved into it and removed.
+    const s = secrets();
+    if (s) {
+      let t = '';
+      try {
+        t = (await s.getToken()) || '';
+      } catch {
+        /* unavailable */
+      }
+      const legacy = lsGet(LS_TOKEN);
+      if (legacy) {
+        if (!t) {
+          await storeToken(legacy);
+          t = legacy;
+        }
+        lsRemove(LS_TOKEN);
+      }
+      setSessionToken(t);
+    }
     if (!hasToken() || get().account) return;
     try {
       const account = await fetchAuthedUser();

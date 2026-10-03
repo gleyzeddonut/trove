@@ -31,7 +31,17 @@ export class GitHubError extends Error {
   }
 }
 
-function token(): string {
+// In the desktop app the token lives encrypted in the main process
+// (safeStorage) and is handed to this module once at boot / connect; it is
+// never written to localStorage there. The localStorage path remains for the
+// plain-browser build.
+let sessionToken = '';
+export function setSessionToken(t: string) {
+  sessionToken = t;
+}
+
+export function currentToken(): string {
+  if (sessionToken) return sessionToken;
   try {
     const t = localStorage.getItem('trove.ghtoken');
     if (t) return t;
@@ -40,6 +50,7 @@ function token(): string {
   }
   return (typeof window !== 'undefined' && window.troveEnv?.githubToken) || '';
 }
+const token = currentToken;
 
 function headers(accept = 'application/vnd.github+json'): HeadersInit {
   const h: Record<string, string> = { Accept: accept };

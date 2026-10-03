@@ -11,8 +11,17 @@ const storage = {
 };
 const run = vi.fn();
 const confirm = vi.fn();
+// The desktop app's encrypted token store (safeStorage in the main process).
+const secrets = { getToken: vi.fn(async () => ''), setToken: vi.fn(async (_t: string) => {}), clearToken: vi.fn(async () => {}) };
 vi.stubGlobal('localStorage', storage);
-vi.stubGlobal('window', { confirm, troveTerminal: { run } });
+vi.stubGlobal('window', { confirm, troveTerminal: { run }, troveSecrets: secrets });
+const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({
+  ok: true,
+  status: 200,
+  headers: { get: () => null },
+  json: async () => ({ login: 'dan', name: 'Dan', email: null, avatar_url: 'https://a/x.png' }),
+}));
+vi.stubGlobal('fetch', fetchMock);
 
 const { useTroveStore } = await import('./useTroveStore');
 
@@ -28,8 +37,45 @@ beforeEach(() => {
   mem.clear();
   run.mockReset();
   confirm.mockReset();
-  useTroveStore.setState({ installed: [], consoleOpen: false });
+  fetchMock.mockClear();
+  secrets.getToken.mockReset().mockResolvedValue('');
+  secrets.setToken.mockReset().mockResolvedValue(undefined);
+  secrets.clearToken.mockReset().mockResolvedValue(undefined);
+  useTroveStore.setState({ installed: [], consoleOpen: false, account: null });
   useTroveStore.getState().setSetting('confirmInstall', false);
+});
+
+const authHeader = (call: number) => ((fetchMock.mock.calls[call][1]?.headers ?? {}) as Record<string, string>).Authorization;
+
+describe('GitHub token — kept in the encrypted store, never in localStorage, in the desktop app', () => {
+  it('connect stores the token via the secure bridge and authenticates with it', async () => {
+    await useTroveStore.getState().connectGithub('ghp_new');
+    expect(secrets.setToken).toHaveBeenCalledWith('ghp_new');
+    expect(mem.has('trove.ghtoken')).toBe(false);
+    expect(authHeader(0)).toBe('Bearer ghp_new');
+    expect(useTroveStore.getState().account?.login).toBe('dan');
+  });
+
+  it('disconnect clears the secure store', async () => {
+    useTroveStore.getState().disconnectGithub();
+    expect(secrets.clearToken).toHaveBeenCalledTimes(1);
+    expect(useTroveStore.getState().account).toBeNull();
+  });
+
+  it('hydrate loads the stored token and authenticates with it', async () => {
+    secrets.getToken.mockResolvedValue('ghp_stored');
+    await useTroveStore.getState().hydrateAccount();
+    expect(authHeader(0)).toBe('Bearer ghp_stored');
+    expect(useTroveStore.getState().account?.login).toBe('dan');
+  });
+
+  it('hydrate migrates a legacy localStorage token into the secure store and removes it', async () => {
+    mem.set('trove.ghtoken', 'ghp_legacy');
+    await useTroveStore.getState().hydrateAccount();
+    expect(secrets.setToken).toHaveBeenCalledWith('ghp_legacy');
+    expect(mem.has('trove.ghtoken')).toBe(false);
+    expect(authHeader(0)).toBe('Bearer ghp_legacy');
+  });
 });
 
 describe('install — one-line commands', () => {

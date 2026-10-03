@@ -2,9 +2,10 @@
 // the embedded terminal in the renderer talks to over IPC. Clicking "run" in
 // the UI ends up here as a real command written into that shell.
 
-import { app, BrowserWindow, ipcMain, shell, Menu, clipboard } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, Menu, clipboard, safeStorage } from 'electron';
 import path from 'node:path';
 import os from 'node:os';
+import fs from 'node:fs';
 import * as pty from 'node-pty';
 import electronUpdater from 'electron-updater';
 import { isTrustedNavigation, isWebTabUrl, makeBurstLimiter } from './guards';
@@ -272,6 +273,31 @@ ipcMain.on('video:popout', (_e, url: string) => {
 });
 
 ipcMain.handle('app:version', () => app.getVersion());
+
+// --- Encrypted GitHub token (safeStorage → Keychain-backed on macOS) ------
+// Stored as ciphertext in userData; the renderer only ever sees the plaintext
+// over IPC, never writes it to its own storage.
+const tokenFile = () => path.join(app.getPath('userData'), 'github-token.enc');
+ipcMain.handle('secrets:get-token', (): string => {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return '';
+    return safeStorage.decryptString(fs.readFileSync(tokenFile()));
+  } catch {
+    return ''; // no file yet, or undecryptable (e.g. keychain changed)
+  }
+});
+ipcMain.handle('secrets:set-token', (_e, token: string) => {
+  if (typeof token !== 'string' || !token) throw new Error('empty token');
+  if (!safeStorage.isEncryptionAvailable()) throw new Error('encryption unavailable');
+  fs.writeFileSync(tokenFile(), safeStorage.encryptString(token), { mode: 0o600 });
+});
+ipcMain.handle('secrets:clear-token', () => {
+  try {
+    fs.unlinkSync(tokenFile());
+  } catch {
+    /* already gone */
+  }
+});
 
 // --- Find in page (⌘F) ----------------------------------------------------
 ipcMain.on('find:query', (_e, opts: { text: string; forward?: boolean; findNext?: boolean }) => {

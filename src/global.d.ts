@@ -53,6 +53,13 @@ export interface TroveVideoApi {
   popOut(url: string): void;
 }
 
+/** Encrypted token store (safeStorage in the main process). */
+export interface TroveSecretsApi {
+  getToken(): Promise<string>;
+  setToken(token: string): Promise<void>;
+  clearToken(): Promise<void>;
+}
+
 declare global {
   interface Window {
     troveTerminal?: TroveTerminalApi;
@@ -62,6 +69,7 @@ declare global {
     troveBrowser?: TroveBrowserApi;
     troveFind?: TroveFindApi;
     troveVideo?: TroveVideoApi;
+    troveSecrets?: TroveSecretsApi;
     /** Dismiss the boot splash (defined inline in index.html). */
     __troveBootReady?: () => void;
   }

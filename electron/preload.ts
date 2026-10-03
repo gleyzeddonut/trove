@@ -50,6 +50,22 @@ contextBridge.exposeInMainWorld('troveEnv', {
   githubToken: process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '',
 });
 
+// Encrypted secret store (safeStorage in the main process) for the GitHub
+// token, so it never sits in plaintext on disk.
+const secrets = {
+  getToken(): Promise<string> {
+    return ipcRenderer.invoke('secrets:get-token');
+  },
+  setToken(token: string): Promise<void> {
+    return ipcRenderer.invoke('secrets:set-token', token);
+  },
+  clearToken(): Promise<void> {
+    return ipcRenderer.invoke('secrets:clear-token');
+  },
+};
+
+contextBridge.exposeInMainWorld('troveSecrets', secrets);
+
 // Auto-update bridge: subscribe to status, and trigger check/download/install.
 const updater = {
   onStatus(cb: (s: unknown) => void) {
@@ -127,3 +143,4 @@ export type TroveUpdaterApi = typeof updater;
 export type TroveYouTubeApi = typeof youtube;
 export type TroveBrowserApi = typeof browser;
 export type TroveFindApi = typeof find;
+export type TroveSecretsApi = typeof secrets;
