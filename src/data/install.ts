@@ -184,7 +184,11 @@ export function planInstallCommands(rawSetup: string[], fallbackUrl: string, nam
   const steps = setup.filter((c) => !/^\s*git\s+clone\b/.test(c) && !enterRepoCd.test(c));
 
   return {
-    clone: url ? `git clone ${url}` : null,
+    // GIT_TERMINAL_PROMPT=0: never stop to ask for credentials. The setup line
+    // is typed into the shell right behind this one, so a prompt (private or
+    // missing repo) would swallow it as the username. Failing fast instead
+    // means no directory, so the `cd <dir> &&` chain stops before any step.
+    clone: url ? `GIT_TERMINAL_PROMPT=0 git clone ${url}` : null,
     dir,
     steps,
     risky: setup.some((c) => RISKY_STEP.test(c)),

@@ -90,7 +90,7 @@ describe('planInstallCommands — safe command building', () => {
       'https://github.com/adriantanner/Spotify2mp3.git',
       'Spotify2mp3',
     );
-    expect(plan.clone).toBe('git clone https://github.com/adriantanner/Spotify2mp3.git');
+    expect(plan.clone).toBe('GIT_TERMINAL_PROMPT=0 git clone https://github.com/adriantanner/Spotify2mp3.git');
     expect(plan.dir).toBe('Spotify2mp3');
     expect(plan.steps).toEqual(['python3 -m venv venv', 'source venv/bin/activate', 'pip install -r requirements.txt']);
     expect(plan.risky).toBe(false);
@@ -98,7 +98,7 @@ describe('planInstallCommands — safe command building', () => {
 
   it('strips the README clone + enter-repo cd, borrowing the block URL (no double clone/cd)', () => {
     const plan = planInstallCommands(['git clone https://github.com/x/y', 'cd y', 'make'], 'unused', 'y');
-    expect(plan.clone).toBe('git clone https://github.com/x/y');
+    expect(plan.clone).toBe('GIT_TERMINAL_PROMPT=0 git clone https://github.com/x/y');
     expect(plan.dir).toBe('y');
     expect(plan.steps).toEqual(['make']); // clone + `cd y` removed
   });
@@ -120,7 +120,7 @@ describe('planInstallCommands — shell-injection defenses', () => {
   it('ignores a malicious README clone URL, falling back to the safe API URL', () => {
     const plan = planInstallCommands(['git clone https://x/y;rm -rf ~', 'make'], 'https://github.com/a/b.git', 'b');
     // The dangerous token must NOT reach the shell; we use the repo's real URL.
-    expect(plan.clone).toBe('git clone https://github.com/a/b.git');
+    expect(plan.clone).toBe('GIT_TERMINAL_PROMPT=0 git clone https://github.com/a/b.git');
     expect(plan.clone).not.toContain('rm -rf');
     expect(plan.steps).toEqual(['make']);
   });
@@ -139,7 +139,7 @@ describe('planInstallCommands — shell-injection defenses', () => {
 
   it('accepts a normal scp-style git URL', () => {
     const plan = planInstallCommands(['make'], 'git@github.com:owner/repo.git', 'repo');
-    expect(plan.clone).toBe('git clone git@github.com:owner/repo.git');
+    expect(plan.clone).toBe('GIT_TERMINAL_PROMPT=0 git clone git@github.com:owner/repo.git');
     expect(plan.dir).toBe('repo');
   });
 });
@@ -191,7 +191,7 @@ describe('isRiskyCommand — one-line installs that need a loud confirm', () => 
 describe('planInstallCommands — compound README lines', () => {
   it('splits `git clone X && cd X && make` so the build step survives', () => {
     const plan = planInstallCommands(['git clone https://github.com/a/b && cd b && make'], 'unused', 'b');
-    expect(plan.clone).toBe('git clone https://github.com/a/b');
+    expect(plan.clone).toBe('GIT_TERMINAL_PROMPT=0 git clone https://github.com/a/b');
     expect(plan.dir).toBe('b');
     expect(plan.steps).toEqual(['make']);
   });
@@ -209,14 +209,25 @@ describe('planInstallCommands — clone URL charset is shell-inert', () => {
     "https://github.com/a/b'x",
   ])('rejects %s and falls back to the API URL', (bad) => {
     const plan = planInstallCommands([`git clone ${bad}`, 'make'], 'https://github.com/a/b.git', 'b');
-    expect(plan.clone).toBe('git clone https://github.com/a/b.git');
+    expect(plan.clone).toBe('GIT_TERMINAL_PROMPT=0 git clone https://github.com/a/b.git');
   });
   it('refuses when the fallback itself has an active character', () => {
     expect(planInstallCommands(['make'], 'https://github.com/a/b!x', 'b').clone).toBeNull();
   });
   it('still accepts ordinary URLs with query, fragment, percent-encoding and scp form', () => {
-    expect(planInstallCommands(['make'], 'https://github.com/a/b.git?ref=main#x', 'b').clone).toBe('git clone https://github.com/a/b.git?ref=main#x');
-    expect(planInstallCommands(['make'], 'https://github.com/a/my%20repo', 'r').clone).toBe('git clone https://github.com/a/my%20repo');
-    expect(planInstallCommands(['make'], 'git@github.com:a/b.git', 'b').clone).toBe('git clone git@github.com:a/b.git');
+    expect(planInstallCommands(['make'], 'https://github.com/a/b.git?ref=main#x', 'b').clone).toBe('GIT_TERMINAL_PROMPT=0 git clone https://github.com/a/b.git?ref=main#x');
+    expect(planInstallCommands(['make'], 'https://github.com/a/my%20repo', 'r').clone).toBe('GIT_TERMINAL_PROMPT=0 git clone https://github.com/a/my%20repo');
+    expect(planInstallCommands(['make'], 'git@github.com:a/b.git', 'b').clone).toBe('GIT_TERMINAL_PROMPT=0 git clone git@github.com:a/b.git');
+  });
+});
+
+describe('planInstallCommands — the clone never waits on a credential prompt', () => {
+  // The setup line is typed into the shell right behind the clone. If git
+  // stopped to ask for a username (private or missing repo), that line would
+  // be consumed as the answer. GIT_TERMINAL_PROMPT=0 makes git fail instead,
+  // the directory never appears, `cd` fails, and nothing after it runs.
+  it('prefixes the clone with GIT_TERMINAL_PROMPT=0', () => {
+    const plan = planInstallCommands(['make'], 'https://github.com/a/b.git', 'b');
+    expect(plan.clone).toBe('GIT_TERMINAL_PROMPT=0 git clone https://github.com/a/b.git');
   });
 });
