@@ -8,7 +8,7 @@ import os from 'node:os';
 import fs from 'node:fs';
 import * as pty from 'node-pty';
 import electronUpdater from 'electron-updater';
-import { isTrustedNavigation, isWebTabUrl, makeBurstLimiter } from './guards';
+import { isTrustedNavigation, isWebTabUrl, makeBurstLimiter, respawnDelay } from './guards';
 
 const { autoUpdater } = electronUpdater;
 
@@ -24,6 +24,10 @@ let updaterReady = false;
 // so popping the terminal in/out (or first paint) isn't blank.
 let ptyBuffer = '';
 const PTY_BUFFER_CAP = 100_000;
+// Crash-loop guard for the shell respawn (see respawnDelay in guards.ts).
+let ptyStartedAt = 0;
+let ptyRecentCrashes = 0;
+let ptyRespawnTimer: NodeJS.Timeout | null = null;
 
 /** The window currently showing the terminal (popout takes priority). */
 function ptyTarget(): BrowserWindow | null {
@@ -54,6 +58,11 @@ function defaultShell(): string {
 
 function startPty() {
   if (ptyProcess) return;
+  if (ptyRespawnTimer) {
+    clearTimeout(ptyRespawnTimer);
+    ptyRespawnTimer = null;
+  }
+  ptyStartedAt = Date.now();
   // Launch as a LOGIN shell so it sources the user's profile (.zprofile,
   // Homebrew shellenv, nvm, etc.). A GUI app gets a minimal PATH from launchd,
   // so without this `npm`, `brew`, `cargo`, … are "command not found".
@@ -73,8 +82,19 @@ function startPty() {
 
   ptyProcess.onExit(() => {
     ptyProcess = null;
-    // Respawn so the terminal stays usable for the life of the app.
-    if (win && !win.isDestroyed()) startPty();
+    // Respawn so the terminal stays usable for the life of the app — with a
+    // backoff if the shell keeps dying right after it starts.
+    if (!win || win.isDestroyed()) return;
+    const next = respawnDelay({ lifetimeMs: Date.now() - ptyStartedAt, recentCrashes: ptyRecentCrashes });
+    ptyRecentCrashes = next.recentCrashes;
+    if (next.delayMs === 0) startPty();
+    else {
+      safeSend(ptyTarget(), 'pty:data', `\r\n[trove] shell exited immediately — retrying in ${next.delayMs / 1000}s\r\n`);
+      ptyRespawnTimer = setTimeout(() => {
+        ptyRespawnTimer = null;
+        if (win && !win.isDestroyed()) startPty();
+      }, next.delayMs);
+    }
   });
 }
 
@@ -391,6 +411,8 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  if (ptyRespawnTimer) clearTimeout(ptyRespawnTimer);
+  ptyRespawnTimer = null;
   ptyProcess?.kill();
   ptyProcess = null;
 });

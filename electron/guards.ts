@@ -47,3 +47,17 @@ export function makeBurstLimiter(max: number, windowMs: number): (now: number) =
     return true;
   };
 }
+
+/**
+ * How long to wait before respawning the shell after it exits. A shell that
+ * ran for a while (the user typed `exit`, or it crashed once after hours)
+ * comes back at once and the crash counter resets. One that died within a few
+ * seconds of starting is probably going to do it again — back off 1s, 2s, 4s…
+ * up to 30s so a broken $SHELL cannot spin the main process.
+ */
+export function respawnDelay(input: { lifetimeMs: number; recentCrashes: number }): { delayMs: number; recentCrashes: number } {
+  const QUICK_DEATH_MS = 5000;
+  if (input.lifetimeMs >= QUICK_DEATH_MS) return { delayMs: 0, recentCrashes: 0 };
+  const recentCrashes = input.recentCrashes + 1;
+  return { delayMs: Math.min(30_000, 1000 * 2 ** (recentCrashes - 1)), recentCrashes };
+}

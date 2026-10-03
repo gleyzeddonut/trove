@@ -1,7 +1,7 @@
 // Pure navigation/URL policy for the main process (kept free of `electron`
 // imports so it can be unit-tested).
 import { describe, expect, it } from 'vitest';
-import { isTrustedNavigation, isWebTabUrl, makeBurstLimiter } from './guards';
+import { isTrustedNavigation, isWebTabUrl, makeBurstLimiter, respawnDelay } from './guards';
 
 const appPath = '/Applications/Trove.app/Contents/Resources/app.asar';
 
@@ -45,5 +45,18 @@ describe('makeBurstLimiter — a page cannot spam new tabs', () => {
     expect(allow(30)).toBe(false);
     expect(allow(999)).toBe(false);
     expect(allow(1001)).toBe(true); // the first event has aged out
+  });
+});
+
+describe('respawnDelay — the shell is respawned when it exits, but a crash loop backs off', () => {
+  it('a shell that lived a while respawns immediately', () => {
+    expect(respawnDelay({ lifetimeMs: 60_000, recentCrashes: 0 })).toEqual({ delayMs: 0, recentCrashes: 0 });
+    expect(respawnDelay({ lifetimeMs: 60_000, recentCrashes: 4 })).toEqual({ delayMs: 0, recentCrashes: 0 }); // reset
+  });
+  it('a shell that died within a few seconds backs off exponentially, capped', () => {
+    expect(respawnDelay({ lifetimeMs: 200, recentCrashes: 0 })).toEqual({ delayMs: 1000, recentCrashes: 1 });
+    expect(respawnDelay({ lifetimeMs: 200, recentCrashes: 1 })).toEqual({ delayMs: 2000, recentCrashes: 2 });
+    expect(respawnDelay({ lifetimeMs: 200, recentCrashes: 2 })).toEqual({ delayMs: 4000, recentCrashes: 3 });
+    expect(respawnDelay({ lifetimeMs: 200, recentCrashes: 10 })).toEqual({ delayMs: 30_000, recentCrashes: 11 });
   });
 });
