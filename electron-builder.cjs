@@ -4,12 +4,13 @@
 
 const { default: afterPack } = require('./scripts/afterPack.cjs');
 
-// Notarize only when credentials are supplied. @electron/notarize reads the
-// Apple ID / app-specific password (or API key) from the environment; the Team
-// ID comes from APPLE_TEAM_ID.
+// Notarize only when credentials are supplied. electron-builder 26 takes a
+// boolean here and reads everything else from the environment: the API key
+// (APPLE_API_KEY / APPLE_API_KEY_ID / APPLE_API_ISSUER) or Apple ID
+// (APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD), and the Team ID (APPLE_TEAM_ID).
 const teamId = process.env.APPLE_TEAM_ID;
 const hasNotaryCreds = !!(process.env.APPLE_API_KEY || process.env.APPLE_ID);
-const notarize = teamId && hasNotaryCreds ? { teamId } : false;
+const notarize = !!(teamId && hasNotaryCreds);
 
 // Where in-app updates are published / fetched from (GitHub Releases). Set
 // GH_OWNER (and optionally GH_REPO) when building so the feed points at your
