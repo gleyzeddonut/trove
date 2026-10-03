@@ -7,6 +7,7 @@ import path from 'node:path';
 import os from 'node:os';
 import * as pty from 'node-pty';
 import electronUpdater from 'electron-updater';
+import { isTrustedNavigation, isWebTabUrl, makeBurstLimiter } from './guards';
 
 const { autoUpdater } = electronUpdater;
 
@@ -27,6 +28,17 @@ const PTY_BUFFER_CAP = 100_000;
 function ptyTarget(): BrowserWindow | null {
   if (popoutWin && !popoutWin.isDestroyed()) return popoutWin;
   return win && !win.isDestroyed() ? win : null;
+}
+
+/**
+ * Pin an app window (one that carries the preload bridge, i.e. shell access) to
+ * our own renderer. Without this, dropping an .html file or a URL onto the
+ * window navigates it there — and that page would inherit `troveTerminal.run`.
+ */
+function lockNavigation(w: BrowserWindow) {
+  w.webContents.on('will-navigate', (e, url) => {
+    if (!isTrustedNavigation(url, { appPath: app.getAppPath(), devUrl: DEV_URL })) e.preventDefault();
+  });
 }
 
 /** Send to a window only if it's still alive (avoids "Object has been destroyed"). */
@@ -121,6 +133,7 @@ function createWindow() {
     shell.openExternal(url);
     return { action: 'deny' };
   });
+  lockNavigation(win);
 
   // Harden the in-app browser dock: webviews must never receive a preload or
   // node access (so embedded pages stay sandboxed from the shell bridges).
@@ -197,6 +210,7 @@ function openPopout() {
     shell.openExternal(url);
     return { action: 'deny' };
   });
+  lockNavigation(popoutWin);
   if (DEV_URL) {
     popoutWin.loadURL(`${DEV_URL}#/__terminal`);
   } else {
@@ -306,7 +320,12 @@ ipcMain.on('updater:install', () => {
 // window.open) become new Trove browser tabs instead of unmanaged windows.
 app.on('web-contents-created', (_e, contents) => {
   if (contents.getType() === 'webview') {
+    // The page is untrusted: only http(s) may become a tab (never file:,
+    // javascript:, or an app-launching custom scheme), and a page that
+    // window.open()s in a loop is throttled rather than flooding the tab strip.
+    const allowOpen = makeBurstLimiter(5, 2000);
     contents.setWindowOpenHandler(({ url }) => {
+      if (!isWebTabUrl(url) || !allowOpen(Date.now())) return { action: 'deny' };
       const host = contents.hostWebContents;
       if (host && !host.isDestroyed()) host.send('browser:new-tab', url);
       else shell.openExternal(url);

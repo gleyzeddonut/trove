@@ -7,7 +7,7 @@ import { create } from 'zustand';
 import type { Project, TypeFilter } from '../types';
 import type { UpdateState } from '../global';
 import { fetchAuthedUser, uninstallCommandFor, type Account, type DiscoverSort } from '../data/github';
-import { planInstallCommands } from '../data/install';
+import { isRiskyCommand, planInstallCommands } from '../data/install';
 
 /** Library list ordering (client-side, since the library is local). */
 export type LibrarySort = 'recent' | 'stars' | 'name';
@@ -324,12 +324,16 @@ export const useTroveStore = create<TroveState>((set, get) => ({
   clearLibrary: () => {
     const items = get().installed;
     if (items.length === 0) return;
+    // Destructive and plural: always confirm, listing every real command.
+    const cmds = items.map((p) => uninstallCommandFor(p.install)).filter((c): c is string => !!c);
+    const summary = cmds.length
+      ? `This will run in the terminal:\n\n${cmds.join('\n')}`
+      : 'Nothing needs uninstalling — the entries are just removed.';
+    const ok = typeof window !== 'undefined' && window.confirm(`Clear your library (${items.length})?\n\n${summary}`);
+    if (!ok) return;
     saveInstalled([]);
-    set({ installed: [], consoleOpen: true });
-    for (const p of items) {
-      const cmd = uninstallCommandFor(p.install);
-      if (cmd) runInTerminal(cmd);
-    }
+    set({ installed: [], consoleOpen: cmds.length > 0 });
+    for (const cmd of cmds) runInTerminal(cmd);
   },
 
   setUpdate: (u) => set({ update: u }),
@@ -489,9 +493,15 @@ export const useTroveStore = create<TroveState>((set, get) => ({
       return;
     }
 
-    // One-line install: optional safety confirm, then run it as before.
-    if (get().settings.confirmInstall) {
-      const ok = typeof window !== 'undefined' && window.confirm(`Run this in the terminal?\n\n${p.install}`);
+    // One-line install. A README-derived line that chains, pipes, substitutes,
+    // or escalates (`; curl … | sh`, `$(…)`, sudo) is not a plain package
+    // install: show it in full and ask, whatever the confirm setting says.
+    const risky = isRiskyCommand(p.install);
+    if (risky || get().settings.confirmInstall) {
+      const warn = risky
+        ? '\n\n⚠️  This is not a plain package install — it chains, pipes, downloads, or needs sudo. Only continue if you trust this repo.'
+        : '';
+      const ok = typeof window !== 'undefined' && window.confirm(`Run this in the terminal?\n\n${p.install}${warn}`);
       if (!ok) return;
     }
     if (get().settings.autoConsole) set({ consoleOpen: true });
@@ -501,14 +511,19 @@ export const useTroveStore = create<TroveState>((set, get) => ({
 
   uninstall: (p) => {
     if (!get().installed.some((x) => x.id === p.id)) return;
+    // Run the real uninstall command in the terminal when there is one;
+    // otherwise (git clone / npx / docker / …) just dropping it is the action.
+    const cmd = uninstallCommandFor(p.install);
+    // Same gate as install: the user asked to vet every terminal command.
+    if (cmd && get().settings.confirmInstall) {
+      const ok = typeof window !== 'undefined' && window.confirm(`Run this in the terminal?\n\n${cmd}`);
+      if (!ok) return;
+    }
     set((s) => {
       const next = s.installed.filter((x) => x.id !== p.id);
       saveInstalled(next);
       return { installed: next };
     });
-    // Run the real uninstall command in the terminal when there is one;
-    // otherwise (git clone / npx / docker / …) just dropping it is the action.
-    const cmd = uninstallCommandFor(p.install);
     if (cmd) {
       set({ consoleOpen: true });
       runInTerminal(cmd);

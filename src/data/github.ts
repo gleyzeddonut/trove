@@ -7,7 +7,10 @@
 import type { Project, ProjectType } from '../types';
 import { langColor } from './constants';
 import { k, timeAgo } from '../lib/derive';
-import { extractInstallPlan } from './install';
+import { extractInstallPlan, isRiskyCommand } from './install';
+
+// What a package token may look like: `jq`, `@scope/pkg@1.2.3`, `github.com/x/y@latest`, `black[d]`.
+const SAFE_PKG_TOKEN = /^[A-Za-z0-9@._+:/\[\]~=-]+$/;
 
 const API = 'https://api.github.com';
 
@@ -248,6 +251,9 @@ function installFor(repo: GhRepo): string {
  * docker, go install, …) — in that case we just drop it from the library.
  */
 export function uninstallCommandFor(install: string): string | undefined {
+  // A chained / piped / substituted install line was never a plain package
+  // install, so there is nothing trustworthy to mirror — just drop it.
+  if (isRiskyCommand(install)) return undefined;
   let tokens = install.trim().split(/\s+/);
   let sudo = '';
   if (tokens[0] === 'sudo') {
@@ -256,7 +262,9 @@ export function uninstallCommandFor(install: string): string | undefined {
   }
   const tool = tokens[0];
   const last = tokens[tokens.length - 1];
-  const pkg = last && !last.startsWith('-') ? last : undefined;
+  // Only a plain package spec (name, scope, version, URL-ish module path) may
+  // be interpolated into the uninstall command — never shell syntax.
+  const pkg = last && !last.startsWith('-') && SAFE_PKG_TOKEN.test(last) ? last : undefined;
   const global = tokens.includes('-g') || tokens.includes('--global');
   if (!pkg) return undefined;
 

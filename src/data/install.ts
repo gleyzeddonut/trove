@@ -143,6 +143,17 @@ export interface InstallCommands {
 // destructive removes, privilege escalation, command substitution.
 const RISKY_STEP = /\|\s*(sudo\s+)?(bash|sh|zsh)\b|\brm\s+-|\bsudo\b|\bcurl\b|\bwget\b|\$\(|`|\bchmod\b|\bmkfs\b|>\s*\/dev\//;
 
+// Shell syntax that turns "one package-manager command" into something else:
+// chaining, piping, redirection, substitution. A one-line install containing
+// any of these is not a plain install and must be shown in full and confirmed.
+const SHELL_META = /[;&|<>`]|\$\(|\$\{|\n/;
+
+/** True when a single install line needs an explicit, full-text confirmation
+ *  before it is typed into the shell — regardless of the user's confirm setting. */
+export function isRiskyCommand(cmd: string): boolean {
+  return SHELL_META.test(cmd) || RISKY_STEP.test(cmd);
+}
+
 /**
  * Turn a README setup block into concrete shell commands. Pure: no execution.
  * - `clone` clones the repo (we synthesize it; if the block clones itself we

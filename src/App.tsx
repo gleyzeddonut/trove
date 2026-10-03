@@ -79,6 +79,18 @@ export default function App() {
     };
   }, []);
 
+  // Never let a dropped file or URL navigate the app window (the main process
+  // also refuses it via will-navigate; this stops the attempt at the source).
+  useEffect(() => {
+    const block = (e: DragEvent) => e.preventDefault();
+    window.addEventListener('dragover', block);
+    window.addEventListener('drop', block);
+    return () => {
+      window.removeEventListener('dragover', block);
+      window.removeEventListener('drop', block);
+    };
+  }, []);
+
   // Mirror pop-out state from the main process into the store.
   useEffect(() => {
     const t = window.troveTerminal;
