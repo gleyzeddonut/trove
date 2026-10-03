@@ -7,6 +7,7 @@
 import type { Project, ProjectType } from '../types';
 import { langColor } from './constants';
 import { k, timeAgo } from '../lib/derive';
+import { extractInstallPlan } from './install';
 
 const API = 'https://api.github.com';
 
@@ -319,6 +320,7 @@ function mapRepo(repo: GhRepo): Project {
     topics: repo.topics || [],
     forksNum: repo.forks_count,
     htmlUrl: repo.html_url,
+    cloneUrl: repo.clone_url,
     cover,
     accent,
     install: installFor(repo),
@@ -385,47 +387,7 @@ function parseReadme(md: string): Pick<Project, 'about' | 'features' | 'usage'> 
   return { about, features, usage };
 }
 
-// Pull the *real* install command out of the README — prefer a code block
-// under an "Install"/"Getting started" heading, else the first package-manager
-// line in any code block. Returns undefined if nothing recognizable is found.
-const PKG_CMD =
-  /^\s*\$?\s*(sudo\s+)?((npm|pnpm|yarn|npx|pip3?|pipx|brew|cargo|go|gem|apt(-get)?|docker|nix(-env)?|conda|uv|bun|deno|scoop|choco|winget|gh)\b|python3?\s+-m\s+pip\b)/;
-const cleanCmd = (s: string) => s.replace(/^\s*\$\s?/, '').replace(/^\s*>\s?/, '').trim();
-
-function extractInstall(md: string): string | undefined {
-  const lines = md.split('\n');
-
-  // 1) first code block following an install-ish heading
-  const headingIdx = lines.findIndex((l) =>
-    /^#{1,6}\s+.*(install|installation|getting started|setup|quick ?start)/i.test(l),
-  );
-  if (headingIdx >= 0) {
-    for (let i = headingIdx + 1; i < lines.length; i++) {
-      if (/^```/.test(lines[i].trim())) {
-        for (let j = i + 1; j < lines.length && !/^```/.test(lines[j].trim()); j++) {
-          const cmd = cleanCmd(lines[j]);
-          if (PKG_CMD.test(cmd)) return cmd.slice(0, 160);
-        }
-        break;
-      }
-      if (/^#{1,3}\s/.test(lines[i])) break; // hit the next major section
-    }
-  }
-
-  // 2) fallback: first package-manager line in any fenced code block
-  let inFence = false;
-  for (const raw of lines) {
-    if (/^```/.test(raw.trim())) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) {
-      const cmd = cleanCmd(raw);
-      if (PKG_CMD.test(cmd)) return cmd.slice(0, 160);
-    }
-  }
-  return undefined;
-}
+// Install-plan parsing lives in ./install (pure + unit-tested).
 
 // --- Public API -----------------------------------------------------------
 
@@ -527,8 +489,16 @@ export async function fetchRepo(owner: string, name: string): Promise<RepoDetail
   const project = mapRepo(repo);
   if (md) {
     Object.assign(project, parseReadme(md));
-    const realInstall = extractInstall(md); // prefer the README's real command
-    if (realInstall) project.install = realInstall;
+    const plan = extractInstallPlan(md); // prefer the README's real steps
+    if (plan && 'single' in plan) {
+      project.install = plan.single;
+    } else if (plan) {
+      // Clone-and-build app: the headline command is the clone; the real setup
+      // steps run afterwards (see the store's two-phase install).
+      const selfClones = /^\s*git\s+clone\b/.test(plan.steps[0]);
+      project.install = selfClones ? plan.steps[0] : `git clone ${project.cloneUrl}`;
+      project.setup = plan.steps;
+    }
   }
   if (!project.about) project.about = project.desc || 'No description provided.';
   if (!project.requires) project.requires = project.lang !== '—' ? `Built with ${project.lang}.` : 'See the repository for details.';
@@ -641,6 +611,37 @@ export async function fetchAuthedUser(): Promise<Account> {
 export async function fetchUsers(handles: string[]): Promise<Creator[]> {
   const settled = await Promise.allSettled(handles.map((h) => fetchUser(h)));
   return settled.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+}
+
+// Lightweight creator from a /search/users hit — the search endpoint returns
+// only login/avatar/type, so followers/bio stay empty (we skip N per-user
+// fetches to stay well under the rate limit).
+function mapUserLite(u: { login: string; avatar_url: string; type?: string }): Creator {
+  return {
+    handle: u.login,
+    name: u.login,
+    verified: u.type === 'Organization',
+    followers: '',
+    followersNum: 0,
+    following: 0,
+    location: '',
+    bio: '',
+    avatarUrl: u.avatar_url,
+    cover: coverFor(u.login).cover,
+    publicRepos: 0,
+  };
+}
+
+/** Search GitHub users/orgs by name or handle. One API call, capped small. */
+export async function searchUsers(query: string, perPage = 6): Promise<Creator[]> {
+  const q = query.trim();
+  if (!q) return [];
+  const data = await withSearchSlot(() =>
+    ghJson<{ items: { login: string; avatar_url: string; type?: string }[] }>(
+      `/search/users?q=${encodeURIComponent(q)}&per_page=${perPage}`,
+    ),
+  );
+  return (data.items || []).map(mapUserLite);
 }
 
 export interface CreatorProfile {

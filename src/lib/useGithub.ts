@@ -11,7 +11,9 @@ import {
   fetchRepo,
   previewDetail,
   searchRepos,
+  searchUsers,
   type Contributor,
+  type Creator,
   type DiscoverSort,
   type CreatorProfile,
   type FeedData,
@@ -198,6 +200,44 @@ export function useGithubSearch(query: string, enabled: boolean, sort: DiscoverS
   const hasMore = !loading && results.length > 0 && results.length < total && pageRef.current < SEARCH_MAX_PAGE;
 
   return { results, total, loading, loadingMore, error, hasMore, loadMore };
+}
+
+// Debounced GitHub user search — powers the "People" results on Discover and
+// the "find makers" box in the Feed. Guards against out-of-order responses.
+export function useUserSearch(query: string, enabled: boolean): { people: Creator[]; loading: boolean } {
+  const [people, setPeople] = useState<Creator[]>([]);
+  const [loading, setLoading] = useState(false);
+  const reqRef = useRef(0);
+
+  useEffect(() => {
+    const q = query.trim();
+    // Require ≥2 chars — a single letter matches ~everyone and burns a search
+    // call on every keystroke (user search shares the repo-search rate budget).
+    if (!enabled || q.length < 2) {
+      setPeople([]);
+      setLoading(false);
+      return;
+    }
+    const token = ++reqRef.current;
+    setLoading(true);
+    // Longer debounce than repo search: people are the secondary result, so we
+    // wait for a real pause before spending the call.
+    const id = window.setTimeout(async () => {
+      try {
+        const users = await searchUsers(q);
+        if (reqRef.current !== token) return;
+        setPeople(users);
+        setLoading(false);
+      } catch {
+        if (reqRef.current !== token) return;
+        setPeople([]);
+        setLoading(false);
+      }
+    }, 650);
+    return () => window.clearTimeout(id);
+  }, [query, enabled]);
+
+  return { people, loading };
 }
 
 interface RepoState {

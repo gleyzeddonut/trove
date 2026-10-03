@@ -14,7 +14,8 @@ import { Box, SearchIcon } from '../components/icons';
 import { TROVE_TYPES } from '../data/constants';
 import { SHELVES, type Shelf as ShelfDef } from '../data/shelves';
 import { troveMatch } from '../data/match';
-import { useGithubSearch } from '../lib/useGithub';
+import { CreatorListRow } from '../components/social';
+import { useGithubSearch, useUserSearch } from '../lib/useGithub';
 import { useTroveStore } from '../store/useTroveStore';
 import { useNavActions } from '../lib/useNavActions';
 import type { Project, TypeFilter } from '../types';
@@ -55,6 +56,10 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
   // search it'd just be ranking the default popular set, so fall back to stars.
   const effectiveSort = !q && discoverSort === 'best' ? 'stars' : discoverSort;
   const { results: remote, total, loading, loadingMore, error, hasMore, loadMore } = useGithubSearch(query, !isLib && !!q, effectiveSort);
+
+  // People matching the query (Discover only) — repos are the main event, so
+  // this rides alongside them rather than replacing the list.
+  const { people } = useUserSearch(query, !isLib && !!q);
 
   // Dismiss the boot splash once there's real content behind it. On Discover's
   // landing that's the shelves (each Shelf signals when its cards load); for
@@ -184,6 +189,21 @@ export function Storefront({ mode }: { mode: 'discover' | 'library' }) {
               </div>
             ) : (
               <>
+            {/* PEOPLE — user results ride above the repo list on Discover */}
+            {!isLib && people.length > 0 && (
+              <div style={{ marginTop: 18, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 13, padding: '12px 8px 8px' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '0 8px 6px' }}>
+                  <span style={{ fontFamily: sans, fontSize: 13, fontWeight: 700, color: C.sub }}>People</span>
+                  <span style={{ fontFamily: mono, fontSize: 11.5, color: C.faint }}>{people.length}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {people.map((c) => (
+                    <CreatorListRow key={c.handle} c={c} />
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* CONTROLS — type chips (Library only) + sort */}
             <div style={{ display: 'flex', gap: 9, marginTop: 16, alignItems: 'center', flexWrap: 'wrap' }}>
               {isLib &&

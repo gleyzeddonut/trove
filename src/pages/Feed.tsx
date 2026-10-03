@@ -2,10 +2,12 @@
 // real GitHub public events. Two columns: followed + suggested creators on the
 // left, activity cards on the right.
 
-import { C, sans, TABBAR_H } from '../tokens';
+import { useState } from 'react';
+import { C, mono, sans, TABBAR_H } from '../tokens';
 import { Nav } from '../components/Nav';
+import { SearchIcon } from '../components/icons';
 import { ActivityCard, CreatorListRow } from '../components/social';
-import { useFeed } from '../lib/useGithub';
+import { useFeed, useUserSearch } from '../lib/useGithub';
 import { useTroveStore } from '../store/useTroveStore';
 import { useNavActions } from '../lib/useNavActions';
 
@@ -26,6 +28,9 @@ export function Feed() {
   const installedCount = useTroveStore((s) => s.installed.length);
   const feedScope = useTroveStore((s) => s.settings.feedScope);
   const { onNav } = useNavActions();
+
+  const [makerQuery, setMakerQuery] = useState('');
+  const { people, loading: peopleLoading } = useUserSearch(makerQuery, true);
 
   const { data, loading, error } = useFeed(following, feedScope);
 
@@ -50,6 +55,40 @@ export function Feed() {
         <div style={{ display: 'flex', gap: 32, marginTop: 24, alignItems: 'flex-start' }}>
           {/* LEFT: creators */}
           <aside style={{ width: 252, flexShrink: 0, position: 'sticky', top: 80 + TABBAR_H }}>
+            {/* Find makers to follow — searches GitHub users by name/handle. */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 11, padding: '6px 8px 6px 11px' }}>
+                <SearchIcon />
+                <input
+                  value={makerQuery}
+                  onChange={(e) => setMakerQuery(e.target.value)}
+                  placeholder="Find makers to follow…"
+                  aria-label="Find makers to follow"
+                  style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontFamily: sans, fontSize: 13.5, color: C.ink, fontWeight: 500 }}
+                />
+                {makerQuery && (
+                  <button onClick={() => setMakerQuery('')} aria-label="Clear" style={{ border: 'none', background: 'transparent', color: C.faint, cursor: 'pointer', fontSize: 17, padding: '0 4px' }}>
+                    ×
+                  </button>
+                )}
+              </div>
+              {makerQuery.trim() && (
+                <div style={{ marginTop: 8, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 12, padding: '6px 6px' }}>
+                  {people.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      {people.map((c) => (
+                        <CreatorListRow key={c.handle} c={c} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ padding: '10px 8px', fontFamily: mono, fontSize: 12, color: C.faint }}>
+                      {peopleLoading ? 'searching…' : 'no makers found.'}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <Panel title="Following" count={followingCount}>
               {followed.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>

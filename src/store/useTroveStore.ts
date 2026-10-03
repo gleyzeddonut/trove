@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import type { Project, TypeFilter } from '../types';
 import type { UpdateState } from '../global';
 import { fetchAuthedUser, uninstallCommandFor, type Account, type DiscoverSort } from '../data/github';
+import { planInstallCommands } from '../data/install';
 
 /** Library list ordering (client-side, since the library is local). */
 export type LibrarySort = 'recent' | 'stars' | 'name';
@@ -112,6 +113,12 @@ const saveInstalled = (a: Project[]) => {
 
 function runInTerminal(command: string) {
   window.troveTerminal?.run(command);
+}
+
+// Clone URL, tolerating library items persisted before `cloneUrl` existed
+// (derive it from the repo web URL, else the owner/name).
+function cloneUrlOf(p: Project): string {
+  return p.cloneUrl || (p.htmlUrl ? `${p.htmlUrl.replace(/\/$/, '')}.git` : `https://github.com/${p.owner}/${p.name}.git`);
 }
 
 /** A web tab in the browser chrome. `src` is the (immutable) load URL the
@@ -415,19 +422,80 @@ export const useTroveStore = create<TroveState>((set, get) => ({
   isInstalled: (id) => get().installed.some((p) => p.id === id),
 
   install: (p) => {
-    // Optional safety check before running a real command in the shell.
+    const addToLibrary = () => {
+      if (!get().installed.some((x) => x.id === p.id)) {
+        set((s) => {
+          const next = [...s.installed, p];
+          saveInstalled(next);
+          return { installed: next };
+        });
+      }
+    };
+
+    // Clone-and-build apps (venv → deps → build): clone first (safe — just a
+    // download), then ask before running the setup steps that touch the machine.
+    if (p.setup && p.setup.length) {
+      const plan = planInstallCommands(p.setup, cloneUrlOf(p), p.name);
+
+      // If we can't produce a trustworthy clone command (unrecognized/unsafe
+      // URL or an odd repo dir name), don't run anything in the real shell —
+      // just record it and point the user at the repo.
+      if (!plan.clone || !plan.dir) {
+        addToLibrary();
+        set({ consoleOpen: true });
+        runInTerminal(`echo "Open ${p.htmlUrl} and follow its README to install."`);
+        return;
+      }
+
+      const warn = plan.risky
+        ? '\n\n⚠️  These steps include commands that download & run code or need sudo. Only continue if you trust this repo.'
+        : '';
+
+      // With "confirm before running" on, approve the WHOLE plan up front (clone
+      // included) rather than cloning silently — the user asked to vet every
+      // terminal command.
+      if (get().settings.confirmInstall) {
+        const ok =
+          typeof window !== 'undefined' &&
+          window.confirm(`Install ${p.name}?\n\nThis will run:\n\n${plan.clone}\n${plan.steps.map((s) => `${plan.dir}/ » ${s}`).join('\n')}${warn}`);
+        if (!ok) return;
+        set({ consoleOpen: true });
+        addToLibrary();
+        runInTerminal(plan.clone);
+        if (plan.steps.length) runInTerminal([`cd ${plan.dir}`, ...plan.steps].join(' && '));
+        return;
+      }
+
+      // Default flow: clone first (safe — validated URL, just a download), then
+      // ask before the setup steps that actually touch the machine.
+      if (get().settings.autoConsole) set({ consoleOpen: true });
+      addToLibrary();
+
+      // Phase 1: clone only (no cd), so the cwd is unchanged if it fails.
+      runInTerminal(plan.clone);
+
+      if (!plan.steps.length) return; // nothing to build beyond the clone
+
+      // Phase 2: gated by confirmation. `cd <dir> &&` both enters the repo and
+      // guards the chain — if the clone failed, cd fails and nothing else runs.
+      const ok =
+        typeof window !== 'undefined' &&
+        window.confirm(`Set up ${p.name}?\n\nOnce the clone finishes, this runs:\n\n${plan.steps.join('\n')}${warn}`);
+      if (!ok) {
+        runInTerminal(`cd ${plan.dir}`); // leave them inside the cloned repo
+        return;
+      }
+      runInTerminal([`cd ${plan.dir}`, ...plan.steps].join(' && '));
+      return;
+    }
+
+    // One-line install: optional safety confirm, then run it as before.
     if (get().settings.confirmInstall) {
       const ok = typeof window !== 'undefined' && window.confirm(`Run this in the terminal?\n\n${p.install}`);
       if (!ok) return;
     }
     if (get().settings.autoConsole) set({ consoleOpen: true });
-    if (!get().installed.some((x) => x.id === p.id)) {
-      set((s) => {
-        const next = [...s.installed, p];
-        saveInstalled(next);
-        return { installed: next };
-      });
-    }
+    addToLibrary();
     runInTerminal(p.install);
   },
 

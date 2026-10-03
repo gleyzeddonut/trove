@@ -108,6 +108,13 @@ export const GitHubMark = ({ s = 14 }: { s?: number }) => (
   </svg>
 );
 
+export const Copy = ({ s = 13, stroke = 'currentColor' }: { s?: number; stroke?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 16 16" fill="none" stroke={stroke} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
+    <path d="M10.5 5.5V4a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5" />
+  </svg>
+);
+
 export const ExternalLink = ({ s = 11, stroke = 'currentColor' }: { s?: number; stroke?: string }) => (
   <svg width={s} height={s} viewBox="0 0 12 12" fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M4.5 2.5H2.5v7h7v-2M7 2.5h2.5V5M9.5 2.5L5.5 6.5" />

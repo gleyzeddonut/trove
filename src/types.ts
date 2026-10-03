@@ -31,12 +31,18 @@ export interface Project {
   forksNum: number;
   /** Link to the repository page on github.com. */
   htmlUrl: string;
+  /** git clone URL (https), for cloning + the "copy repo address" action. */
+  cloneUrl: string;
   /** CSS gradient string (thumb / cover). */
   cover: string;
   /** Representative accent color. */
   accent: string;
-  /** The install command string. */
+  /** The headline install command (cards / detail). For clone-and-build apps
+   *  this is the `git clone …` line; the real steps live in `setup`. */
   install: string;
+  /** Full multi-step setup block from the README (venv, deps, build …), for
+   *  apps that must be cloned and built locally. Absent for one-line installs. */
+  setup?: string[];
   /** Search keyword synonyms. */
   kw: string;
   // README content (detail page):

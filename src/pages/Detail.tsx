@@ -2,11 +2,12 @@
 // API (metadata, parsed README, real contributor avatars). The embedded
 // terminal stays available so you can install from here too.
 
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { C, CHIP, mono, sans } from '../tokens';
 import { Nav } from '../components/Nav';
 import {
-  BackArrow, Check, Clock, ExternalLink, FileIcon, Fork, GitHubMark, IssueDot, License, Play, Star, Watch,
+  BackArrow, Check, Clock, Copy, ExternalLink, FileIcon, Fork, GitHubMark, IssueDot, License, Play, Star, Watch,
 } from '../components/icons';
 import { openInApp } from '../lib/external';
 import { Markdown } from '../components/Markdown';
@@ -22,6 +23,44 @@ function PillBtn({ icon, label, count }: { icon: React.ReactNode; label: string;
       {label}
       <span style={{ fontFamily: mono, fontSize: 12, color: C.ink, background: C.sunk, border: `1px solid ${C.line}`, borderRadius: 6, padding: '1px 7px' }}>{count}</span>
     </div>
+  );
+}
+
+// Copy the repo's clone address to the clipboard, with a brief "Copied" state.
+function CopyRepoButton({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // Fallback for contexts where the async clipboard API is unavailable.
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+      } catch {
+        /* give up silently */
+      }
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1400);
+  };
+  return (
+    <button
+      className="hd-btn"
+      onClick={copy}
+      title={`Copy clone address — ${url}`}
+      aria-label="Copy repository clone address"
+      style={{ display: 'flex', alignItems: 'center', gap: 7, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 9, padding: '7px 12px', fontFamily: sans, fontSize: 13, fontWeight: 600, color: copied ? C.green : C.sub, cursor: 'pointer' }}
+    >
+      {copied ? <Check s={13} w={2} /> : <Copy s={13} stroke={C.faint} />}
+      {copied ? 'Copied' : 'Copy address'}
+    </button>
   );
 }
 
@@ -98,6 +137,7 @@ export function Detail() {
             <span style={{ color: C.ink, fontWeight: 600 }}>{p.name}</span>
           </span>
           <div style={{ flex: 1 }} />
+          <CopyRepoButton url={p.cloneUrl || `${p.htmlUrl.replace(/\/$/, '')}.git`} />
           <button
             className="hd-btn"
             onClick={() => openInApp(p.htmlUrl)}
@@ -192,6 +232,11 @@ export function Detail() {
                     run
                   </span>
                 </button>
+              )}
+              {!installed && p.setup && p.setup.length > 0 && (
+                <div style={{ marginTop: 9, fontFamily: sans, fontSize: 12, lineHeight: 1.5, color: C.faint }}>
+                  Clones the repo, then asks before running its {p.setup.length}-step setup.
+                </div>
               )}
             </div>
 
