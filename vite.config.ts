@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import electron from 'vite-plugin-electron/simple';
+import { cspPlugin } from './electron/csp';
 
 // Electron + Vite. The renderer is the React app in src/; the main and preload
 // processes live in electron/. node-pty is a native module, so it must stay
@@ -11,6 +12,8 @@ export default defineConfig({
   base: './',
   plugins: [
     react(),
+    // Content-Security-Policy for the renderer, build only (see electron/csp.ts).
+    cspPlugin(),
     electron({
       main: {
         entry: 'electron/main.ts',
