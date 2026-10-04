@@ -77,10 +77,13 @@ to have its command typed and executed there.
 Other scripts:
 
 ```bash
+npm test            # vitest unit tests (install planner, store gates, guards, CSP)
 npm run typecheck   # tsc --noEmit (renderer + electron)
-npm run build       # type-check + production renderer/main bundle
+npm run build       # type-check + production renderer/main bundle (+ CSP meta)
 npm run rebuild     # fallback: rebuild node-pty against Electron's ABI
 ```
+
+See `HANDOFF.md` for state, decisions and the traps.
 
 ## Packaging a signed macOS app
 
@@ -114,8 +117,8 @@ warn on a downloaded copy).
 Notes:
 - No custom app icon yet — drop `build/icon.icns` to brand it; electron-builder
   picks it up automatically.
-- The GitHub token is stored per-machine (`localStorage`), so re-enter it via the
-  nav avatar's token field on the other Mac.
+- The GitHub token is stored per-machine, encrypted with Electron's `safeStorage`
+  (Keychain-backed on macOS), so re-enter it via Settings › Account on another Mac.
 
 ## In-app auto-update
 
@@ -166,10 +169,9 @@ launch (or within 6h) and show the Update button.
 Because the UI and the dock share **one** shell, they stay in sync — the point
 of the design.
 
-> Note: the sample projects are fictional, so their commands (`npx lumen …`,
-> `brew install conduit`, …) will error in the shell just like any real
-> not-yet-published package would. That's genuine terminal behavior. Swap
-> `src/data/projects.ts` for real projects/commands to install real software.
+> Safety: a README-derived command that chains, pipes, downloads or needs sudo
+> always shows in full and asks before running, whatever the confirm setting;
+> clone-and-build repos clone first and confirm the setup steps. See `HANDOFF.md`.
 
 ### Keyboard
 
@@ -180,8 +182,12 @@ of the design.
 
 ```
 electron/
-  main.ts        window + real PTY shell + IPC
-  preload.ts     window.troveTerminal + window.troveEnv (token) bridges
+  main.ts        window + real PTY shell + IPC + encrypted token store
+  preload.ts     troveTerminal / troveSecrets / troveUpdater / troveBrowser / … bridges
+  guards.ts      navigation + new-tab URL policy, burst limiter, respawn backoff (tested)
+  csp.ts         Content-Security-Policy, injected into index.html at build (tested)
+public/
+  boot.js        boot-splash dismissal (external so the CSP can forbid inline scripts)
 scripts/
   postinstall.mjs  restore +x on node-pty's spawn-helper after install
   afterPack.cjs    same, inside the packaged app
@@ -190,7 +196,9 @@ src/
   types.ts       Project + filters
   data/
     github.ts    live GitHub client: search, repo detail, README parse, users,
-                 events → activity feed, mapping
+                 events → activity feed, mapping, uninstall mirror, token source
+    install.ts   README → install plan (one-liner vs clone-and-build), safe
+                 command building, risky-command detection (tested)
     constants.ts type list + language dot colors
     match.ts     token-based search matcher (used by the Library)
   lib/
@@ -211,3 +219,5 @@ src/
   clone command's real exit code would need a shell-integration sentinel.
 - Detail uses 3 API calls (repo + README + contributors); a token is recommended
   for heavy browsing. README parsing is best-effort across very different formats.
+- Unauthenticated search is 10 calls/min; the Discover landing spends 8 on shelves
+  plus one warming the Top page, so a token matters most on a cold start.
